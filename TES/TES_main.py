@@ -7,7 +7,7 @@ Created on April 15 2021
 @author: Tian Hu at LIST
 
 © 2022 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu
+Authors : Tian Hu, tian.hu@list.lu
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
