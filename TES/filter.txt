@@ -1,0 +1,297 @@
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19426_027_20211209T044842_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_001_20211209T063123_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_009_20211209T063928_0601_01.h5
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,21,30) (37,21,30)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_003_20211208T121449_0601_01.h5
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+operands could not be broadcast together with shapes (33,17,25) (37,17,25)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_009_20211208T122001_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_002_20211209T063215_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19426_028_20211209T044934_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_010_20211209T064020_0601_01.h5
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+operands could not be broadcast together with shapes (37,22,27) (33,22,27)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19420_020_20211208T184406_0601_01.h5
+operands could not be broadcast together with shapes (37,18,25) (33,18,25)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19417_011_20211208T135310_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19426_029_20211209T045026_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_003_20211209T063307_0601_01.h5
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_011_20211209T064112_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,19,24) (37,19,24)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_011_20211208T122212_0601_01.h5
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,20,30) (37,20,30)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_004_20211208T121541_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_18:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_18:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_19:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_08_19:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19420_022_20211208T190050_0601_01.h5
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+operands could not be broadcast together with shapes (37,19,24) (33,19,24)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19417_012_20211208T135402_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_005_20211209T063452_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19426_031_20211209T045315_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,20,26) (37,20,26)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_012_20211208T122303_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,20,30) (37,20,30)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_005_20211208T121633_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_19:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_08_19:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19425_003_20211209T031414_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19427_016_20211209T062625_0601_01.h5
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+operands could not be broadcast together with shapes (37,20,24) (33,20,24)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19417_013_20211208T135454_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19428_007_20211209T063744_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+operands could not be broadcast together with shapes (33,21,26) (37,21,26)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_013_20211208T122355_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_03:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_09_03:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19425_005_20211209T031620_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_06:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_06:00.grib'
+Error while opening ERA5 Data -> stopping there
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,20,29) (37,20,29)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_006_20211208T121725_0601_01.h5
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+operands could not be broadcast together with shapes (37,21,26) (33,21,26)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19417_014_20211208T135546_0601_01.h5
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_03:00.grib
+Reading ERA5 file era5_single_levels-2021_12_09_03:00.grib
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19426_025_20211209T044658_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+operands could not be broadcast together with shapes (33,22,27) (37,22,27)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19417_009_20211208T135126_0601_01.h5
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_09_04:00.grib
+No valid message found in file: '/ECOSTRESS_FAST/ERA5/era5_37levels-2021_12_09_04:00.grib'
+Error while opening ERA5 Data -> stopping there
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,19,28) (37,19,28)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19416_007_20211208T121817_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+operands could not be broadcast together with shapes (37,21,27) (33,21,27)
+Error while opening ERA5 Data -> stopping there
+Run Temperature Emissivity Separation algorithm on ECOSTRESS data /ECOSTRESS_FAST/L1B_RAD/ECOSTRESS_L1B_RAD_19417_015_20211208T135638_0601_01.h5
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_12:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+operands could not be broadcast together with shapes (37,18,26) (33,18,26)
+Error while opening ERA5 Data -> stopping there
+Reading ECOSTRESS L1B data completed
+Aggregating ECOSTRESS L1B data completed
+Reading ERA5 file era5_37levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+operands could not be broadcast together with shapes (33,18,26) (37,18,26)
+Error while opening ERA5 Data -> stopping there
+Reading ERA5 file era5_single_levels-2021_12_08_13:00.grib
+Reading ERA5 file era5_37levels-2021_12_08_14:00.grib
+Reading ERA5 file era5_single_levels-2021_12_08_14:00.grib
+operands could not be broadcast together with shapes (37,22,27) (33,22,27)
+Error while opening ERA5 Data -> stopping there
+
