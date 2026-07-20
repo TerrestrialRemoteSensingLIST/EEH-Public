@@ -23,9 +23,6 @@
 python TES_main.py input.txt
 
 
-# More detailed information about this software can be found on the software description document on the EEH landing page: https://ecostresshub.eu/
-
-
 # The following paper should be cited when using this code:
 Tian Hu, Kaniska Mallick, Glynn C. Hulley, Lluís Perez Planells, Frank M. Göttsche, Martin Schlerf, Patrik Hitzelberger, Yoanne Didry, Zoltan Szantoi, Itziar Alonso, José A. Sobrino, Dražen Skoković, Jean-Louis Roujean, Gilles Boulet, Philippe Gamet, Simon Hook,
 Continental-scale evaluation of three ECOSTRESS land surface temperature products over Europe and Africa: Temperature-based validation and cross-satellite comparison,
