@@ -1,5 +1,18 @@
-# Read the ECOSTRESS L2_LSTE, L1B_GEO and L2_CLOUD data produced by EEH
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+Script to run the STIC model for ET estimation
 
+Created on March 18 2021
+@author: Tian Hu at LIST
+
+© 2022 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu, Kaniska Mallick
+Code licensed under MIT
+SPDX-License-Identifier: MIT
+"""
+
+# Functions for read the ECOSTRESS L2_LSTE, L1B_GEO and L2_CLOUD data 
 import h5py
 import numpy as np
 import os

@@ -11,6 +11,8 @@ Authors : Tian Hu, Kaniska Mallick
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
+
+#Main function for the STIC model
 import sys
 import os
 import numpy as np
