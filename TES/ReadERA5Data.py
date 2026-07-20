@@ -1,5 +1,18 @@
-# Read the ERA5 data
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+Script to run the Temperature Emissivity Separation (TES) algorithm for LST estimation
 
+Created on April 15 2021
+@author: Tian Hu at LIST
+
+© 2022 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu, Kaniska Mallick
+Code licensed under MIT
+SPDX-License-Identifier: MIT
+"""
+
+# Read the ERA5 data
 import cfgrib
 import numpy as np
 import os

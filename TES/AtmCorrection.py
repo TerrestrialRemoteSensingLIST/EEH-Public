@@ -1,10 +1,23 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+Script to run the Temperature Emissivity Separation (TES) algorithm for LST estimation
+
+Created on April 15 2021
+@author: Tian Hu at LIST
+
+© 2022 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu, Kaniska Mallick
+Code licensed under MIT
+SPDX-License-Identifier: MIT
+"""
+
 # Atmospheric correction
-# 2024 
 import pyrttov
 import sys
 import numpy as np
 
-rttov_installdir = '/root/rttov/'
+rttov_installdir = '/root/rttov/' #preinstalled RTTOV lib
 
 # Transform 1D array (same for all profiles) to a [nprof, nlevels] array
 def expand2nprofiles(n, nprof):
