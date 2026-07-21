@@ -1,3 +1,17 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+Script to run the hybrid model for GPP and WUE estimation
+
+Created on May 1 2025
+@author: Ziyu Lin at LIST
+
+© 2025 – Luxembourg Institute of Science and Technology
+Authors : Ziyu Lin, Kaniska Mallick, Tian Hu (tian.hu@list.lu)
+Code licensed under MIT
+SPDX-License-Identifier: MIT
+"""
+
 import sys
 sys.path.insert(0,'./utils')
 
