@@ -286,9 +286,6 @@ def run_TES_from_config_file(config_file):
         with open('execution_'+pid+'_errors.txt', 'w') as file:
             file.write(json.dumps(map_error))
 
-
-
-
 if __name__ == '__main__':
     args = sys.argv
     if len(args) > 1:
