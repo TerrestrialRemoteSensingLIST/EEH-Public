@@ -28,14 +28,12 @@ import xarray as xr
 import rioxarray
 from rioxarray.merge import merge_arrays
 from rasterio.enums import Resampling
-import pandas as pd
 import re
 import time
 import seaborn as sns
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, Polygon, box
 import geopandas as gpd
-import re
 import sys
 from pyhdf.SD import SD, SDC
 from scipy.interpolate import griddata
