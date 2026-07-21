@@ -30,5 +30,6 @@
 # To run the code, type the following in command line
 python STIC_main.py input.txt
 
+
 # The following paper should be cited when using this code:
 Hu, Tian, Mallick, Kaniska, Hitzelberger, P., Didry, Y., Boulet, G., Szantoi, Z., et al. (2023). Evaluating European ECOSTRESS Hub Evapotranspiration Products Across a Range of Soil-Atmospheric Aridity and Biomes Over Europe. Water Resources Research, 59(8), e2022WR034132. https://doi.org/https://doi.org/10.1029/2022WR034132

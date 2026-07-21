@@ -6,7 +6,13 @@ Script to run the STIC model for ET estimation
 Created on March 18 2021
 @author: Tian Hu at LIST
 
+© 2022 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu, Kaniska Mallick
+Code licensed under MIT
+SPDX-License-Identifier: MIT
 """
+
+#Main function for the STIC model and temporal upscaling
 import sys
 import os
 import numpy as np
