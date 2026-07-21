@@ -25,7 +25,7 @@ Input parameters (Order must be the same as below. Example is given in input.txt
 # Usage
 To run the code, type the following in command line:
 
-python STIC_main.py input.txt
+python myProcessor.py input.txt
 
 For processing each image, all the 9 parameters should be on the same line. Different Lines represent the processings for different images.
 
