@@ -6,6 +6,7 @@ The RTTOV lib (version 13.2, https://nwp-saf.eumetsat.int/site/software/rttov/) 
 
 # Algorithm
 The original TES algorithm was developed by Gillespie et al. (1998). More information about the TES algorithm can be found in the paper below:
+
 A. Gillespie, S. Rokugawa, T. Matsunaga, J. S. Cothern, S. Hook and A. B. Kahle, "A temperature and emissivity separation algorithm for Advanced Spaceborne Thermal Emission and Reflection Radiometer (ASTER) images," in IEEE Transactions on Geoscience and Remote Sensing, vol. 36, no. 4, pp. 1113-1126, July 1998, doi: 10.1109/36.700995.
 
 # Inputs
