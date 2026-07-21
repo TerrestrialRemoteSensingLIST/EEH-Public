@@ -3,7 +3,7 @@
 """
 Script to run the STIC model for ET estimation
 
-Created on March 18 2021
+Created on September 1 2024
 @author: Tian Hu at LIST
 
 © 2022 – Luxembourg Institute of Science and Technology
