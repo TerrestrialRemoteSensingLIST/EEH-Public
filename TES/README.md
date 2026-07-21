@@ -15,12 +15,12 @@ Input parameters (Order must be the same as below. Example is given in input.txt
 3) directory for ERA5 data
 4) directory for storing output HDF5 data
 
-# Usage:
+# Usage
 To run the code, type the following in command line:
 python TES_main.py input.txt
 For processing each image, all the required parameters should be on the same line. Different Lines represent the processings for different images.
 
-# Citation:
+# Citation
 The following paper should be cited when using this code:
 Tian Hu, Kaniska Mallick, Glynn C. Hulley, Lluís Perez Planells, Frank M. Göttsche, Martin Schlerf, Patrik Hitzelberger, Yoanne Didry, Zoltan Szantoi, Itziar Alonso, José A. Sobrino, Dražen Skoković, Jean-Louis Roujean, Gilles Boulet, Philippe Gamet, Simon Hook,
 Continental-scale evaluation of three ECOSTRESS land surface temperature products over Europe and Africa: Temperature-based validation and cross-satellite comparison,
