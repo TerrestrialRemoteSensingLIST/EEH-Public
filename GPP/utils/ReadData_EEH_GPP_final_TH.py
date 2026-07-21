@@ -629,8 +629,6 @@ def get_lat_lon(dataset):
 
     return lat, lon
 
-    
-
 
 def interpolate_LAI_value(year, month, day, files_lai, eco_bound):
     """read 10day data and interploate to target date"""
@@ -698,6 +696,7 @@ def interpolate_LAI_value(year, month, day, files_lai, eco_bound):
     ds_filled = ds_interp.fillna(ds_after).fillna(ds_before)
 
     return ds_filled
+
 
 def interpolate_FVC_value(year, month, day, files_fvc, eco_bound):
     """read 10day data and interploate to target date"""
@@ -784,7 +783,6 @@ def find_lai_path(files_lai, year, month, day):
             raise FileNotFoundError(f"No LAI file found for {month:02d}-{day:02d} in {year} or {year_prev}")
 
 
-
 def read_oco2(year, month, day, eco_bound, files_oco2):
     """
     Read OCO-2 XCO2 data for a specific date, or fallback to closest year with same DOY.
@@ -847,7 +845,6 @@ def read_ci(year,month,eco_bound, files_CI):
     return ds
 
 
-
 def plot_heatmap(data, title, label, ax=None):
     if ax is None:
         fig, ax = plt.subplots(figsize=(6, 5))
@@ -863,7 +860,6 @@ GLC30_mapper = {
     'CRO': 2, 'EBF': 5, 'DBF': 6, 'ENF': 7, 'DNF': 8, 'MF': 9,
     'SHR': 12, 'GRA': 13, 'SAV': 14, 'WSA':15, 'WET': 18, 'nonV': 0
 }
-
 
 
 # Define discrete colormap
@@ -940,6 +936,7 @@ def big_leaf_calculator(ds, vector):
 
     return gpp
 
+
 def gpp_gs_calculator(gt,CO2, T_C, VPD_hPa):
 
     """
@@ -977,6 +974,7 @@ def gpp_gs_calculator(gt,CO2, T_C, VPD_hPa):
     Ko = 27.48  * np.exp(36.38 * (T - 298.15) / (298.15 * R * T))  # O2 coefficient
     Po = 21  # Partial pressure of O2 in kPa
 
+
     # Michaelis-Menten coefficient for Rubisco
     # K is the Michaelis–Menten coefficient for Rubisco-limited photosynthesis at a pO2 of 21 kPa.
     K = Kc * (1 + Po / Ko)   #in kPa
@@ -1009,7 +1007,6 @@ def gpp_gs_calculator(gt,CO2, T_C, VPD_hPa):
     GPP = (1-ci_ratio_refined)*(gt*mp_to_molm2)*CO2_ppm*umolCO2_to_gC
 
     return GPP
-
 
 
 #Output the estimates to HDF5 file
