@@ -1,5 +1,5 @@
 # Scope
-This code is to estimate land surface temperature and emissivity from the ECOSTRESS top-of-atmosphere radiance data using the Temperature and Emissivity Separation (TES) algorithm 
+This code is to estimate land surface temperature and emissivity from the ECOSTRESS top-of-atmosphere radiance data using the Temperature and Emissivity Separation (TES) algorithm. 
 
 # Critical dependency
 The RTTOV lib (version 13.2, https://nwp-saf.eumetsat.int/site/software/rttov/) is used for atmospheric correction. Users need to install the lib before using this code.
