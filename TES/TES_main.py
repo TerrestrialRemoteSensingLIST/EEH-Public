@@ -2,23 +2,29 @@
 # -*- coding: utf-8 -*-
 """
 Script to run the Temperature Emissivity Separation (TES) algorithm for LST estimation
-
 Created on April 15 2021
 @author: Tian Hu at LIST
 
-© 2026 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu (tian.hu@list.lu)
-Code licensed under MIT
-SPDX-License-Identifier: MIT
+Modified to run fully locally (no WASDI platform / no S3 access required):
+- Removed all wasdi.* calls -> replaced by an argparse-based CLI and print().
+- Removed cache_S3_with_indexes() / S3_cache.py dependency.
+- Added build_local_geo_map(), which scans a local directory of GEO (.h5)
+  files and builds the same {canonical_name: actual_filename} mapping that
+  Read_L1B_Data() expects.
+- Made the RTTOV installation/wrapper/coefficient paths fully dynamic
+  (forwarded to AtmCorrection.runRTTOV() via CLI arguments).
+- Adapted to the single-coefficient-set variant of the algorithm (no more
+  A1/A2/A3 loop): one LST/emissivity estimate per input file, using a single
+  (alpha1, alpha2, alpha3) triplet exposed as optional CLI arguments.
+- The manual ctypes preload of the RTTOV f2py wrapper (previously hardcoded
+  to a relative './lib/rttov_wrapper_f2py.so' path) is now optional and
+  path-configurable via --rttov-lib-preload (disabled by default), since
+  pyrttov normally loads its own compiled wrapper on import.
 """
-
-# Main function
-
 import argparse
 import glob
 import json
 import os
-import sys
 import traceback
 
 import cv2
@@ -32,21 +38,35 @@ from ReadERA5Data import Read_ERA5
 from TES_vec import LST_Estimate
 
 
+# Default TES coefficients (previously the "EEH TES" / A1 set)
+DEFAULT_ALPHA1 = 0.9895
+DEFAULT_ALPHA2 = 0.7994
+DEFAULT_ALPHA3 = 0.8572
+
+
 def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
                          exclude_substrings=('.xml', '.dmrpp')):
     """
+    Local, pure-Python replacement for cache_S3_with_indexes().
+
+    Read_L1B_Data() builds its lookup key as:
+        'ECOv002_L1B_GEO_' (16 chars) + orbit_str (9) + '_' (1)
+        + date_str (8) + 'T' (1) + hour_str+min_str+sec_str (6)
+      = 41 characters total, i.e. filename[0:41].
+
+    This function scans a local directory directly and reproduces that
+    exact keying.
+
     Parameters
     ----------
     directory_geo : str
         Local folder containing the GEO .h5 files.
     key_index1, key_index2 : int
         Character slice [key_index1:key_index2] of the filename used as
-        the lookup key. Defaults (0, 41) match the existing GEO naming
-        convention and Read_L1B_Data()'s key construction. Only change
-        these if your local filenames differ from that convention.
+        the lookup key. Defaults (0, 41) match the ECOSTRESS GEO naming
+        convention and Read_L1B_Data()'s key construction.
     exclude_substrings : tuple of str
-        Files containing any of these substrings are skipped (mirrors
-        the original `grep -v xml | grep -v dmrpp` filtering).
+        Files containing any of these substrings are skipped.
 
     Returns
     -------
@@ -71,8 +91,8 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
     return geo_map
 
 
-def generate_hdf5_file_V2(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa,
-                           orbit_str, date_str, hour_str, min_str, sec_str, version):
+def generate_hdf5_file(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa,
+                        orbit_str, date_str, hour_str, min_str, sec_str):
     lst_scaled = np.uint16(lst / 0.02)
     emi_b2_scaled = np.uint8((emib2 - 0.489999) / 0.002)
     emi_b4_scaled = np.uint8((emib4 - 0.489999) / 0.002)
@@ -83,11 +103,12 @@ def generate_hdf5_file_V2(directory_output, lst, emib2, emib4, emib5, bbe, mask,
     emi_b4_scaled[mask] = 0
     emi_b5_scaled[mask] = 0
     bbe_scaled[mask] = 0
-    base_filename = ('EEHTES_L2_LSTE_' + version + '_' + orbit_str + '_' + date_str
-                      + 'T' + hour_str + min_str + sec_str + '_0000_00.h5')
+
+    base_filename = ('EEH2TES_L2_LSTE_' + orbit_str + '_' + date_str + 'T'
+                      + hour_str + min_str + sec_str + '_0000_00.h5')
     filename = os.path.join(directory_output, base_filename)
+
     with h5py.File(filename, 'w') as f_lst:
-        # Adding GZIP compression with compression level 4
         dset_names = ['Emis2', 'Emis4', 'Emis5', 'BBE', 'LST', 'qa']
         datasets = {
             'Emis2': emi_b2_scaled,
@@ -110,96 +131,16 @@ def generate_hdf5_file_V2(directory_output, lst, emib2, emib4, emib5, bbe, mask,
             for key, value in attributes[name].items():
                 dset.attrs[key] = value
 
-
-def generate_hdf5_file(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa,
-                        orbit_str, date_str, hour_str, min_str, sec_str, version):
-    """Legacy, uncompressed writer kept for backward-compatibility. Unused by
-    the main pipeline (generate_hdf5_file_V2 is used instead)."""
-    lst_scaled = np.uint16(lst / 0.02)
-    emi_b2_scaled = np.uint8((emib2 - 0.489999) / 0.002)
-    emi_b4_scaled = np.uint8((emib4 - 0.489999) / 0.002)
-    emi_b5_scaled = np.uint8((emib5 - 0.489999) / 0.002)
-    bbe_scaled = np.uint8((bbe - 0.489999) / 0.002)
-
-    lst_scaled[mask] = 0
-    emi_b2_scaled[mask] = 0
-    emi_b4_scaled[mask] = 0
-    emi_b5_scaled[mask] = 0
-    bbe_scaled[mask] = 0
-
-    base_filename = ('EEHTES_L2_LSTE_' + version + '_' + orbit_str + '_' + date_str
-                      + 'T' + hour_str + min_str + sec_str + '_0000_00.h5')
-    filename = os.path.join(directory_output, base_filename)
-    f_lst = h5py.File(filename, 'w')
-
-    dset = f_lst.create_dataset('Emis2', data=emi_b2_scaled)
-    dset.attrs['long_name'] = 'Band 2 Emissivity'
-    dset.attrs['units'] = 'n/a'
-    dset.attrs['format'] = 'scaled'
-    dset.attrs['coordsys'] = 'cartesian'
-    dset.attrs['valid_range'] = np.array([1, 255])
-    dset.attrs['fill_value'] = 0
-    dset.attrs['scale_factor'] = 0.002
-    dset.attrs['add_offset'] = 0.489999
-
-    dset = f_lst.create_dataset('Emis4', data=emi_b4_scaled)
-    dset.attrs['long_name'] = 'Band 4 Emissivity'
-    dset.attrs['units'] = 'n/a'
-    dset.attrs['format'] = 'scaled'
-    dset.attrs['coordsys'] = 'cartesian'
-    dset.attrs['valid_range'] = np.array([1, 255])
-    dset.attrs['fill_value'] = 0
-    dset.attrs['scale_factor'] = 0.002
-    dset.attrs['add_offset'] = 0.489999
-
-    dset = f_lst.create_dataset('Emis5', data=emi_b5_scaled)
-    dset.attrs['long_name'] = 'Band 5 Emissivity'
-    dset.attrs['units'] = 'n/a'
-    dset.attrs['format'] = 'scaled'
-    dset.attrs['coordsys'] = 'cartesian'
-    dset.attrs['valid_range'] = np.array([1, 255])
-    dset.attrs['fill_value'] = 0
-    dset.attrs['scale_factor'] = 0.002
-    dset.attrs['add_offset'] = 0.489999
-
-    dset = f_lst.create_dataset('BBE', data=bbe_scaled)
-    dset.attrs['long_name'] = 'Broad Band Emissivity'
-    dset.attrs['units'] = 'n/a'
-    dset.attrs['format'] = 'scaled'
-    dset.attrs['coordsys'] = 'cartesian'
-    dset.attrs['valid_range'] = np.array([1, 255])
-    dset.attrs['fill_value'] = 0
-    dset.attrs['scale_factor'] = 0.002
-    dset.attrs['add_offset'] = 0.489999
-
-    dset = f_lst.create_dataset('LST', data=lst_scaled)
-    dset.attrs['long_name'] = 'Land Surface Temperature'
-    dset.attrs['units'] = 'K'
-    dset.attrs['format'] = 'scaled'
-    dset.attrs['coordsys'] = 'cartesian'
-    dset.attrs['valid_range'] = np.array([7500, 65535])
-    dset.attrs['fill_value'] = 0
-    dset.attrs['scale_factor'] = 0.02
-    dset.attrs['add_offset'] = 0
-
-    dset = f_lst.create_dataset('qa', data=np.int16(qa))
-    dset.attrs['long_name'] = 'Quality Assurance'
-    dset.attrs['units'] = 'N/A'
-    dset.attrs['format'] = 'scaled'
-    dset.attrs['coordsys'] = 'cartesian'
-    dset.attrs['valid_range'] = np.array([-5, 5])
-    dset.attrs['fill_value'] = -9999
-    dset.attrs['scale_factor'] = 1
-    dset.attrs['add_offset'] = 0
-
-    f_lst.close()
+    return base_filename
 
 
 def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             rttov_installdir, rttov_wrapper_dir, rttov_coef_file=None,
-            error_log_dir='.'):
+            alpha1=DEFAULT_ALPHA1, alpha2=DEFAULT_ALPHA2, alpha3=DEFAULT_ALPHA3,
+            rttov_lib_preload=None, error_log_dir='.'):
     """
-    Run the TES algorithm on a list of ECOSTRESS L1B RAD files.
+    Run the TES algorithm on a list of ECOSTRESS L1B RAD files, using a
+    single (alpha1, alpha2, alpha3) coefficient set.
 
     Parameters
     ----------
@@ -214,15 +155,25 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
     rttov_installdir : str
         RTTOV installation directory (forwarded to AtmCorrection.runRTTOV).
     rttov_wrapper_dir : str
-        Directory of the RTTOV python wrapper (pyrttov), added to sys.path
-        inside AtmCorrection.runRTTOV.
+        Directory of the RTTOV python wrapper (pyrttov).
     rttov_coef_file : str, optional
-        Explicit path to the RTTOV coefficient file. If None, a default
-        path under rttov_installdir is used (see AtmCorrection.py).
+        Explicit path to the RTTOV coefficient file.
+    alpha1, alpha2, alpha3 : float
+        TES coefficients used in LST_Estimate(). Defaults match the
+        original single-coefficient-set variant of this script.
+    rttov_lib_preload : str, optional
+        Optional explicit path to a compiled RTTOV f2py wrapper shared
+        library (.so) to preload via ctypes before importing pyrttov.
+        Only needed as a workaround on environments where pyrttov's own
+        loading mechanism fails; left unset (None) by default.
     error_log_dir : str
-        Directory where the execution error JSON log is written, if any
-        errors occurred.
+        Directory where the execution error JSON log is written, if any.
     """
+    if rttov_lib_preload:
+        import ctypes
+        print(f'Preloading RTTOV wrapper library from {rttov_lib_preload}')
+        ctypes.CDLL(rttov_lib_preload)
+
     map_error = dict()
 
     print(f'Building local GEO file index for {directory_geo}')
@@ -317,33 +268,26 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             trans_f[:, :, band] = griddata(xy, z, (lon_eco, lat_eco), method='nearest')
         print('Interpolating RTTOV trans output completed')
 
-        coefficients_sets = [
-            (0.9895, 0.7994, 0.8572),  # Coefficients for EEH TES
-            (0.9692, 0.8117, 0.9957),  # Coefficients for input samples for SAIL271
-            (0.9824, 0.8931, 0.9757)   # Coefficients for SAIL271
-        ]
-        version_name = ['A1', 'A2', 'A3']
-        for v, (alpha1, alpha2, alpha3) in enumerate(coefficients_sets):
-            try:
-                version = version_name[v]
-                (lst, emib2, emib4, emib5, _, qa) = LST_Estimate(
-                    r2, r4, r5, upclear_f, dnclear_f, trans_f, alpha1, alpha2, alpha3)
+        # Single-coefficient-set TES estimation (no A1/A2/A3 loop)
+        try:
+            (lst, emib2, emib4, emib5, _, qa) = LST_Estimate(
+                r2, r4, r5, upclear_f, dnclear_f, trans_f, alpha1, alpha2, alpha3)
 
-                bbe = np.zeros(emib2.shape)
-                mask = np.logical_and.reduce((emib2 > 0, emib4 > 0, emib5 > 0))
-                bbe[mask] = 0.3287 * emib2[mask] + 0.3783 * emib4[mask] + 0.3158 * emib5[mask] - 0.0255
+            bbe = np.zeros(emib2.shape)
+            mask = np.logical_and.reduce((emib2 > 0, emib4 > 0, emib5 > 0))
+            bbe[mask] = 0.3287 * emib2[mask] + 0.3783 * emib4[mask] + 0.3158 * emib5[mask] - 0.0255
 
-                # Creating mask for the invalid values
-                mask = np.logical_or.reduce((rqa2 > 1, rqa4 > 1, rqa5 > 1, lst == 0, bbe == 0))
+            # Creating mask for the invalid values
+            mask = np.logical_or.reduce((rqa2 > 1, rqa4 > 1, rqa5 > 1, lst == 0, bbe == 0))
 
-                print('Estimating LST completed')
-                generate_hdf5_file_V2(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa,
-                                       orbit_str, date_str, hour_str, min_str, sec_str, version)
-                print('Outputting to HDF5 completed')
-            except Exception:
-                traceback.print_exc()
-                print('Error -> stopping there')
-                map_error[filename_rad] = traceback.format_exc()
+            print('Estimating LST completed')
+            generate_hdf5_file(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa,
+                                orbit_str, date_str, hour_str, min_str, sec_str)
+            print('Outputting to HDF5 completed')
+        except Exception:
+            traceback.print_exc()
+            print('Error -> stopping there')
+            map_error[filename_rad] = traceback.format_exc()
 
     if map_error:
         pid = str(os.getpid())
@@ -356,9 +300,9 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
 
 def build_arg_parser():
     parser = argparse.ArgumentParser(
-        prog='run_TES.py',
+        prog='TES_main.py',
         description=('Run the Temperature Emissivity Separation (TES) algorithm '
-                     'for LST estimation on ECOSTRESS L1B data.'),
+                      'for LST estimation on ECOSTRESS L1B data (single coefficient set).'),
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
 
@@ -398,6 +342,21 @@ def build_arg_parser():
         help=('Explicit path to the RTTOV coefficient file. If not given, defaults to '
               '<rttov-installdir>/rtcoef_rttov12/rttov8pred54L/rtcoef_iss_1_ecostres.dat')
     )
+    rttov_group.add_argument(
+        '--rttov-lib-preload', default=None,
+        help=('Optional explicit path to a compiled RTTOV f2py wrapper shared library '
+              '(.so) to preload via ctypes before importing pyrttov. Only needed as a '
+              'workaround if pyrttov fails to load its wrapper on its own; leave unset '
+              'otherwise.')
+    )
+
+    tes_group = parser.add_argument_group('TES coefficients')
+    tes_group.add_argument('--alpha1', type=float, default=DEFAULT_ALPHA1,
+                            help='alpha1 coefficient used in LST_Estimate().')
+    tes_group.add_argument('--alpha2', type=float, default=DEFAULT_ALPHA2,
+                            help='alpha2 coefficient used in LST_Estimate().')
+    tes_group.add_argument('--alpha3', type=float, default=DEFAULT_ALPHA3,
+                            help='alpha3 coefficient used in LST_Estimate().')
 
     parser.add_argument('--error-log-dir', default='.',
                          help='Directory to write the execution error JSON log to, if any.')
@@ -428,6 +387,10 @@ def main(argv=None):
         rttov_installdir=args.rttov_installdir,
         rttov_wrapper_dir=rttov_wrapper_dir,
         rttov_coef_file=args.rttov_coef_file,
+        alpha1=args.alpha1,
+        alpha2=args.alpha2,
+        alpha3=args.alpha3,
+        rttov_lib_preload=args.rttov_lib_preload,
         error_log_dir=args.error_log_dir,
     )
 
