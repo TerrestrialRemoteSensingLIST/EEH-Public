@@ -1,12 +1,10 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-Script to run the hybrid model for GPP and WUE estimation
-
+Utility functions for the hybrid GPP/WUE model (local version).
 Created on May 1 2025
 @author: Ziyu Lin at LIST
-
-© 2025 – Luxembourg Institute of Science and Technology
+© 2025 - Luxembourg Institute of Science and Technology
 Authors : Ziyu Lin, Kaniska Mallick, Tian Hu (tian.hu@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
@@ -30,6 +28,27 @@ import geopandas as gpd
 from pyhdf.SD import SD, SDC
 from scipy.interpolate import griddata
 
+
+def load_S3_paths(path_txt):  # 'S3_file_paths_V3.txt'
+    """Kept for backward compatibility: parses a flat 'category: path' text
+    file into a dict of lists. Not used by the local pipeline anymore
+    (replaced by build_local_pattern_map / list_local_files_cached in the
+    main script), but harmless to keep around if you still have such
+    files."""
+    categories = [
+        'geo', 'lste', 'cld', 'fvc', 'fapar', 'lai', 'albdir', 'albhem',
+        'era5', 'oco2', 'mota', 'CI', 'GLC30', 'LUCC', 'PAR', 'PARH', 'STIC'
+    ]
+    file_dict = {cat: [] for cat in categories}
+    with open(path_txt, 'r') as f:
+        for line in f:
+            if ': ' in line:
+                category, path = line.strip().split(': ', 1)
+                if category in file_dict:
+                    file_dict[category].append(path)
+    return file_dict
+
+
 def bluesky_albedo_calculator(path_MOTA, eco_bound):
     """
     Calculate blue sky albedo from black and white sky albedo using Long & Ackerman (2000).
@@ -47,6 +66,7 @@ def bluesky_albedo_calculator(path_MOTA, eco_bound):
     WSA = hdf.select('Albedo_WSA_shortwave').get()
     SZA = hdf.select('Local_Solar_Noon').get()
     mask = hdf.select('Albedo_Quality').get()
+    hdf.end()  # close the HDF4 handle explicitly (pyhdf has no context manager)
     # Create lat/lon grids
     rows, cols = BSA.shape
     lat = np.linspace(90, -90, rows)
@@ -154,6 +174,13 @@ def read_and_wrap_GLC30(list_tif, lat_eco, lon_eco, eco_bound, year):
     """
     Reads GLC30 raster files, clips to bounding box, aligns to ECOSTRESS grid,
     and updates ECOSTRESS lat/lon grid with GLC30 values.
+
+    Each GLC30 tile is opened via a `with` context manager, so the
+    underlying GDAL dataset is closed as soon as it has been processed,
+    even if an exception occurs. This avoids leaving multiple GDAL
+    datasets open simultaneously (one per tile), which was found to be
+    the main source of spurious "Error in sys.excepthook" messages at
+    interpreter shutdown.
     """
     lat_max, lat_min, lon_max, lon_min = eco_bound
     band_ind = year - 2016 if year <= 2022 else 6
@@ -169,25 +196,26 @@ def read_and_wrap_GLC30(list_tif, lat_eco, lon_eco, eco_bound, year):
 
     for path in list_tif:
         try:
-            da = rioxarray.open_rasterio(path, masked=True)
-            da_band = da.isel(band=band_ind)
+            with rioxarray.open_rasterio(path, masked=True) as da:
+                da_band = da.isel(band=band_ind)
 
-            da_clipped = da_band.rio.clip_box(
-                minx=lon_min, miny=lat_min, maxx=lon_max, maxy=lat_max,
-                auto_expand=False
-            )
+                da_clipped = da_band.rio.clip_box(
+                    minx=lon_min, miny=lat_min, maxx=lon_max, maxy=lat_max,
+                    auto_expand=False
+                )
 
-            scaled = (da_clipped.data / 10).astype(np.int16)
-            nonveg_mask = np.isin(scaled, [14, 15, 19, 20, 21, 22])
-            scaled[nonveg_mask] = 0
-            scaled[scaled == 1] = 2  # CRO
-            da_clipped.data = scaled
+                scaled = (da_clipped.data / 10).astype(np.int16)
+                nonveg_mask = np.isin(scaled, [14, 15, 19, 20, 21, 22])
+                scaled[nonveg_mask] = 0
+                scaled[scaled == 1] = 2  # CRO
+                da_clipped.data = scaled
 
-            da_aligned = da_clipped.interp(
-                x=glc30_grid['x'],
-                y=glc30_grid['y'],
-                method="nearest"
-            )
+                da_aligned = da_clipped.interp(
+                    x=glc30_grid['x'],
+                    y=glc30_grid['y'],
+                    method="nearest"
+                ).load()  # materialize before the source file is closed
+
             valid = (glc30_grid >= 0)
             glc30_grid = xr.where(valid, glc30_grid, da_aligned)
 
@@ -199,8 +227,6 @@ def read_and_wrap_GLC30(list_tif, lat_eco, lon_eco, eco_bound, year):
         scaled[(glc30_grid['y'].values < 15) & (glc30_grid['y'].values > -30) & (scaled == 13)] = 14  # grass SAV
         scaled[(glc30_grid['y'].values < 15) & (glc30_grid['y'].values > -30) & (scaled == 12)] = 15  # woody WSA
         glc30_grid.data = scaled
-
-    da.close()
 
     return glc30_grid
 
@@ -216,11 +242,11 @@ def Create_cloud_mask(path_cld):
 
 def Extract_ECOSTRESS_from_mask(file_path, mask_cld_ffp, variables=["LST"]):
     """Extract values from ECOSTRESS footprint using provided footprint and cloud masks."""
-    ds = xr.open_dataset(file_path, engine="h5netcdf", phony_dims="sort")
-    missing_vars = [var for var in variables if var not in ds.variables]
-    if missing_vars:
-        raise ValueError(f"Variables not found in dataset: {missing_vars}")
-    return [ds[var].values.astype(float) for var in variables]
+    with xr.open_dataset(file_path, engine="h5netcdf", phony_dims="sort") as ds:
+        missing_vars = [var for var in variables if var not in ds.variables]
+        if missing_vars:
+            raise ValueError(f"Variables not found in dataset: {missing_vars}")
+        return [ds[var].values.astype(float) for var in variables]
 
 
 def Extract_STIC(filename_lste, mask_cld_ffp):
@@ -280,80 +306,107 @@ def extract_from_global_data(path_globe, eco_bound, variable='LAI'):
     """
     Extract and interpolate geospatial data from a global raster/NetCDF file
     within a specified bounding box.
+
+    The source file is opened and closed within a single `with` block, so
+    there is no window during which an open handle could outlive an
+    exception raised while processing it.
     """
     if path_globe.endswith(('.nc', '.nc4', '.h5', '.hdf5', '.cdf')):
-        ds = xr.open_dataset(path_globe, decode_timedelta=False, engine='netcdf4')
+        open_kwargs = dict(engine='netcdf4')
     elif path_globe.endswith('.grib'):
-        ds = xr.open_dataset(path_globe, decode_timedelta=False, engine='cfgrib',
-                              backend_kwargs={"errors": "ignore"})
+        open_kwargs = dict(engine='cfgrib', backend_kwargs={"errors": "ignore"})
     elif path_globe.endswith('.tif'):
-        ds = xr.open_dataset(path_globe, decode_timedelta=False, engine="rasterio")
+        open_kwargs = dict(engine="rasterio")
     else:
         raise ValueError("Only .nc,.nc4,.h5,.hdf5,.cdf,.grib,.tif files are supported.")
 
-    ds_data = ds[variable]
-    lat_name = [name for name in ds_data.coords if ('lat' in name) | (name == 'y')][0]
-    lon_name = [name for name in ds_data.coords if ('lon' in name) | (name == 'x')][0]
-    dims_2d = (lat_name, lon_name)
-    ds_data.rio.set_spatial_dims(x_dim=lon_name, y_dim=lat_name, inplace=True)
-    ds_data.rio.write_crs("EPSG:4326", inplace=True)
+    with xr.open_dataset(path_globe, decode_timedelta=False, **open_kwargs) as ds:
+        ds_data = ds[variable]
+        # Get the actual spatial dimension names, !! important!!
+        lat_name = [name for name in ds_data.coords if ('lat' in name) | (name == 'y')][0]
+        lon_name = [name for name in ds_data.coords if ('lon' in name) | (name == 'x')][0]
+        dims_2d = (lat_name, lon_name)  # 2d
+        # Set spatial dimensions for rioxarray
+        ds_data.rio.set_spatial_dims(x_dim=lon_name, y_dim=lat_name, inplace=True)
+        # Ensure CRS is set
+        ds_data.rio.write_crs("EPSG:4326", inplace=True)
 
-    lat_max, lat_min, lon_max, lon_min = eco_bound
-    da_clipped = ds_data.rio.clip_box(
-        minx=lon_min, miny=lat_min, maxx=lon_max, maxy=lat_max,
-        auto_expand=True
-    )
+        # Bounding box
+        lat_max, lat_min, lon_max, lon_min = eco_bound
+        # Clip to bounding box
+        da_clipped = ds_data.rio.clip_box(
+            minx=lon_min, miny=lat_min, maxx=lon_max, maxy=lat_max,
+            auto_expand=True  # ensures it trims to the box
+        )
 
-    lat_1d, lon_1d = da_clipped[lat_name].values, da_clipped[lon_name].values
-    lon_2d, lat_2d = np.meshgrid(lon_1d, lat_1d)
-    da_clipped = da_clipped.assign_coords({
-        lat_name: (dims_2d, lat_2d),
-        lon_name: (dims_2d, lon_2d)
-    })
-    da_clipped = da_clipped.load()
-    ds.close()
+        # prepare 2-d lat lon for matching with ECOSTRESS
+        lat_1d, lon_1d = da_clipped[lat_name].values, da_clipped[lon_name].values
+        lon_2d, lat_2d = np.meshgrid(lon_1d, lat_1d)
+        da_clipped = da_clipped.assign_coords({
+            lat_name: (dims_2d, lat_2d),
+            lon_name: (dims_2d, lon_2d)
+        })
+        # Materialize the data in memory before the source file is closed
+        da_clipped = da_clipped.load()
     return da_clipped
-
 
 def extract_PAR_from_global_data(path_globe, eco_bound, hour, minute):
     """
-    Extract and interpolate PAR data from a global NetCDF file within a
-    specified bounding box, matching the overpass time.
+    Extract and interpolate geospatial data from a global NetCDF file within a
+    specified bounding box.
+    Args:
+        path_globe (str): Path to NetCDF file.
+        eco_bound (tuple): (lat_max, lat_min, lon_max, lon_min)
+        hour (int): Overpass hour.
+        minute (int): Overpass minute.
+    Returns:
+       tuple: (DataArray at overpass time, DataArray averaged over time)
     """
-    if path_globe.endswith('.nc'):
-        ds = xr.open_dataset(path_globe, decode_timedelta=False, engine='netcdf4')
-        ds_data = ds['PAR']
-        lon_1d = ds.lon.values
-        lat_1d = ds.lat.values
-        lon_2d, lat_2d = np.meshgrid(lon_1d, lat_1d)
-        ds_data = ds_data.assign_coords(lat=(["lat", "lon"], lat_2d),
-                                         lon=(["lat", "lon"], lon_2d))
-    else:
+    if not path_globe.endswith('.nc'):
         raise ValueError("Only .nc files are supported.")
 
-    lat_max, lat_min, lon_max, lon_min = eco_bound
-    mask_bound = (lat_2d >= lat_min) & (lat_2d <= lat_max) & \
-                 (lon_2d >= lon_min) & (lon_2d <= lon_max)
-    time_len = ds_data.sizes['time']
-    mask_3d = np.broadcast_to(mask_bound, (time_len, *mask_bound.shape))
-    mask_da = xr.DataArray(
-        mask_3d,
-        dims=ds_data.dims,
-        coords={
-            'time': ds_data['time'],
-            'lat': ds_data['lat'],
-            'lon': ds_data['lon']
-        }
-    )
-    da_clipped = ds_data.where(mask_da, drop=True)
+    with xr.open_dataset(path_globe, decode_timedelta=False, engine='netcdf4') as ds:
+        ds_data = ds['PAR']
+        # Extract 1D coordinates
+        lon_1d = ds.lon.values
+        lat_1d = ds.lat.values
+        # Create 2D coordinate grids
+        lon_2d, lat_2d = np.meshgrid(lon_1d, lat_1d)
+        # Assign 2D coordinates
+        ds_data = ds_data.assign_coords(lat=(["lat", "lon"], lat_2d),
+                                         lon=(["lat", "lon"], lon_2d))
 
-    time_index = int(hour * 2 + np.round(minute / 30))
-    da_PARH = da_clipped.isel(time=time_index)
-    da_PARmean = da_clipped.mean(dim='time')
+        # Bounding box
+        lat_max, lat_min, lon_max, lon_min = eco_bound
+        mask_bound = (lat_2d >= lat_min) & (lat_2d <= lat_max) & \
+                     (lon_2d >= lon_min) & (lon_2d <= lon_max)
+        # Get time dimension size
+        time_len = ds_data.sizes['time']
+        # Expand mask to 3D: (time, lat, lon)
+        mask_3d = np.broadcast_to(mask_bound, (time_len, *mask_bound.shape))
+        # Wrap in DataArray with matching dims and coords
+        mask_da = xr.DataArray(
+            mask_3d,
+            dims=ds_data.dims,
+            coords={
+                'time': ds_data['time'],
+                'lat': ds_data['lat'],
+                'lon': ds_data['lon']
+            }
+        )
+        # Apply mask
+        da_clipped = ds_data.where(mask_da, drop=True)
+
+        # Estimate time index (assuming 30-min intervals)
+        time_index = int(hour * 2 + np.round(minute / 30))
+        # Extract time slice / mean over time, materialized before closing
+        da_PARH = da_clipped.isel(time=time_index).load()
+        da_PARmean = da_clipped.mean(dim='time').load()
     return da_PARH, da_PARmean
 
 
 def interpolate_ERA5_value(year, month, day, hour, minute, files_era5, eco_bound):
+    # Step 1: find path before and after overpass time
     target_time = datetime(year, month, day, hour, minute)
     before_path = None
     after_path = None
@@ -380,15 +433,20 @@ def interpolate_ERA5_value(year, month, day, hour, minute, files_era5, eco_bound
     if before_path is None or after_path is None:
         raise ValueError("Target date is outside the range of observation ERA5.")
 
+    # Step 2: Read data
+    # t2m 2 m temperature K Air temperature at 2 meters above surface
+    # d2m 2 m dew point temperature K Dew point at 2 meters, used to estimate humidity
     ds_before = extract_from_global_data(before_path, eco_bound, variable=['t2m', 'd2m'])
     ds_after = extract_from_global_data(after_path, eco_bound, variable=['t2m', 'd2m'])
-
+    # Step 3: Interpolate
     weight = (target_time - before_time) / (after_time - before_time)
     ds_interp = ds_before + weight * (ds_after - ds_before)
+    # Step 4: Fill missing values
     ds_filled = ds_interp.fillna(ds_after).fillna(ds_before)
 
-    t2m = ds_filled['t2m']
-    t2m_C = t2m - 273.15
+    # Step 5: calculate vpd
+    t2m = ds_filled['t2m']  # °C = K - 273.15
+    t2m_C = t2m - 273.15  # in °C
     d2m = ds_filled['d2m']
     vpd_hPa = calculate_vpd_from_t2m_d2m(t2m, d2m)
     return t2m_C, vpd_hPa

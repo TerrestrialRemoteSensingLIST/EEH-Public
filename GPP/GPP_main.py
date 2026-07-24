@@ -42,6 +42,7 @@ import glob
 import hashlib
 import json
 import os
+import sys
 import re
 import time
 import traceback
@@ -228,7 +229,6 @@ def list_local_files_cached(directory, pattern='*', label=None,
         except Exception as e:
             print(f'[{label}] Warning: failed to write cache {cache_path}: {e}')
     return files
-
 
 def build_all_caches(geo_dir, cld_dir, parh_dir, lai_dir, fvc_dir, era5_dir, oco2_dir, glc30_dir,
                       geo_pattern, cloud_pattern, parh_pattern, lai_pattern, fvc_pattern,
@@ -642,6 +642,9 @@ def main(argv=None):
         force_rebuild_cache=args.force_rebuild_cache,
         error_log_dir=args.error_log_dir,
     )
+    print("All done.")
+    sys.stdout.flush()
+    #os._exit(0)
 
 
 if __name__ == '__main__':
