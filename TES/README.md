@@ -10,10 +10,7 @@ The original TES algorithm was developed by Gillespie et al. (1998). More inform
 A. Gillespie, S. Rokugawa, T. Matsunaga, J. S. Cothern, S. Hook and A. B. Kahle, "A temperature and emissivity separation algorithm for Advanced Spaceborne Thermal Emission and Reflection Radiometer (ASTER) images," in IEEE Transactions on Geoscience and Remote Sensing, vol. 36, no. 4, pp. 1113-1126, July 1998, doi: 10.1109/36.700995.
 
 # Inputs
-This step used to require a fixed 4-column input.txt config file (RAD
-filename / GEO directory / ERA5 directory / output directory). This has
-been replaced by command-line arguments (see Usage below):
-
+The command-line arguments are listed as below:
 1) `--input-files` / `--input-dir` : ECOSTRESS L1B_RAD (V002) file(s) to process
 2) `--geo-dir`     : directory for ECOSTRESS L1B_GEO (V002)
 3) `--era5-dir`    : directory for ERA5 data
