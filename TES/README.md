@@ -19,7 +19,13 @@ Input parameters (Order must be the same as below. Example is given in input.txt
 # Usage
 To run the code, type the following in command line:
 
-python TES_main.py input.txt
+python TES_main.py \
+    --input-files /data/ECOv002_L1B_RAD_..._0000_00.h5 /data/ECOv002_L1B_RAD_..._0000_01.h5 \
+    --geo-dir /data/geo \
+    --era5-dir /data/era5 \
+    --output-dir /data/output \
+    --rttov-installdir /root/rttov \
+    --rttov-wrapper-dir /root/rttov/wrapper
 
 For processing each image, all the required parameters should be on the same line. Different Lines represent the processings for different images.
 
