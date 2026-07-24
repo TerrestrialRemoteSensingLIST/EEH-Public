@@ -5,19 +5,14 @@ Script to run the Temperature Emissivity Separation (TES) algorithm for LST esti
 Created on April 15 2021
 @author: Tian Hu at LIST
 
-Modified to run fully locally (no S3 access required):
-- Removed cache_S3_with_indexes / S3_cache dependency.
-- Added build_local_geo_map(), which scans a local directory of GEO (.h5)
-   files and builds the same {canonical_name: actual_filename} mapping that
-   Read_L1B_Data() expects, so no code changes were needed downstream.
-
-Further modified to:
-- Replace the legacy 4-column config-file (input.txt) parsing with a proper
-  argparse-based CLI.
-- Make the RTTOV installation/wrapper paths and coefficient file fully
-  dynamic (passed as CLI arguments -> forwarded to AtmCorrection.runRTTOV()
-  instead of being hardcoded in AtmCorrection.py).
+© 2026 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu)
+Code licensed under MIT
+SPDX-License-Identifier: MIT
 """
+
+# Main function
+
 import argparse
 import glob
 import json
@@ -39,24 +34,6 @@ from TES_vec import LST_Estimate
 def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
                          exclude_substrings=('.xml', '.dmrpp')):
     """
-    Local, pure-Python replacement for cache_S3_with_indexes().
-
-    Original S3 version (S3_cache.py) worked by:
-      1. `ls -U <mount_folder><folder>` (excluding .xml / .dmrpp files),
-      2. keying each resulting filename by a fixed character slice
-         thing[key_index1:key_index2],
-      3. mapping that key -> the full filename.
-
-    Read_L1B_Data() builds its lookup key as:
-        'ECOv002_L1B_GEO_' (16 chars) + orbit_str (9) + '_' (1)
-        + date_str (8) + 'T' (1) + hour_str+min_str+sec_str (6)
-      = 41 characters total, i.e. filename[0:41].
-
-    This function reproduces that exact keying, but scans a local
-    directory directly instead of shelling out to `ls` against an S3
-    mount, and takes directory_geo as an argument instead of a
-    hardcoded mount_folder/folder pair.
-
     Parameters
     ----------
     directory_geo : str
