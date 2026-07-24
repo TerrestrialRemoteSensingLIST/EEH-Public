@@ -200,6 +200,8 @@ def read_and_wrap_GLC30(list_tif, lat_eco, lon_eco, eco_bound, year):
         scaled[(glc30_grid['y'].values < 15) & (glc30_grid['y'].values > -30) & (scaled == 12)] = 15  # woody WSA
         glc30_grid.data = scaled
 
+    da.close()
+
     return glc30_grid
 
 
@@ -308,6 +310,8 @@ def extract_from_global_data(path_globe, eco_bound, variable='LAI'):
         lat_name: (dims_2d, lat_2d),
         lon_name: (dims_2d, lon_2d)
     })
+    da_clipped = da_clipped.load()
+    ds.close()
     return da_clipped
 
 
