@@ -20,6 +20,9 @@ The command-line arguments are listed as below:
 --oco2-dir : directory for OCO-2 XCO2 data
 --glc30-dir : directory for GLC30 land cover tiles
 --lut-file : path to the LookUpTable_LUE_HH_gsFULL-globe.csv file
+--geo-pattern (optional) : regex pattern (one capturing group) used to match ECOSTRESS L1B_GEO filenames. Default: (ECOv002_L1B_GEO.*)_\d{4}_\d{2}\.h5
+--cloud-pattern (optional) : regex pattern (one capturing group) used to match ECOSTRESS L2_CLOUD filenames. Default: (ECOv002_L2_CLOUD.*)_\d{4}_\d{2}\.h5
+--error-log-dir (optional) : directory to write the execution error JSON log to, if any. Default: current directory
 
 #Usage
 To run the code, type the following in command line:
