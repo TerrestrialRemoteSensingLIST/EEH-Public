@@ -53,17 +53,6 @@ def _cache_file_path(cache_dir, label, directory, pattern):
 def build_local_pattern_map(directory, pattern, label=None,
                              cache_dir=None, force_rebuild=False):
     """
-    Local, pure-Python replacement for cache_S3_with_pattern().
-    Scans `directory`, applies re.search(pattern, filename) to every entry,
-    and returns {captured_group_1: actual_filename}. Results are optionally
-    cached to disk (JSON) to avoid rescanning slow/networked storage on
-    every run.
-
-    When multiple files share the same key (e.g. a .h5 file and its
-    .h5.xml / .h5.dmrpp sidecars, if the pattern is not anchored with '$'),
-    the file whose name is lexicographically greatest is kept
-    deterministically, with a log message.
-
     Parameters
     ----------
     directory : str
@@ -140,11 +129,6 @@ def build_local_pattern_map(directory, pattern, label=None,
 def list_local_files_cached(directory, pattern='*', label=None,
                              cache_dir=None, force_rebuild=False):
     """
-    Local, pure-Python replacement for cache_S3_simple(). Lists the
-    absolute paths of files in `directory` matching a glob-style `pattern`
-    (fnmatch), with the same caching/scandir optimisations as
-    build_local_pattern_map().
-
     Parameters
     ----------
     directory : str
