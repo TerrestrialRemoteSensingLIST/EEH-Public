@@ -4,24 +4,16 @@
 Script to run the STIC model for ET estimation
 
 Created on September 1 2024
-@author: Tian Hu at LIST
+@author: Tian Hu, Kaniska Mallick, Yoanne Didry at LIST
 
-© 2024 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
+© 2026 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
-
-Modified to run fully locally (no WASDI platform dependency):
-- Removed all wasdi.* calls (wasdi.init, wasdi.getPath, wasdi.getSavePath,
-  wasdi.getParameter, wasdi.updateStatus, wasdi.wasdiLog) -> replaced by
-  plain Python (print) and an argparse-based CLI, mirroring run_TES.py.
-- Removed cache_S3_with_pattern() / S3_cache.py dependency.
-- Added build_local_pattern_map(), a local, regex-based replacement that
-  scans a local directory and builds the same {key: actual_filename}
-  mapping that Read_ECOSTRESS() / Read_Ancillary() expect, so downstream
-  code did not need to change. Uses re.search() (not re.match()), matching
-  the original cache_S3_with_pattern() behaviour.
 """
+
+# Main function
+
 import argparse
 import glob
 import json
