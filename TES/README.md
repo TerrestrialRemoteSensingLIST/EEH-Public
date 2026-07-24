@@ -27,7 +27,6 @@ python TES_main.py \
     --rttov-installdir /root/rttov \
     --rttov-wrapper-dir /root/rttov/wrapper
 
-For processing each image, all the required parameters should be on the same line. Different Lines represent the processings for different images.
 
 # Citation
 The following paper should be cited when using this code:
