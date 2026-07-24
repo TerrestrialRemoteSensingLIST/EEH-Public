@@ -6,7 +6,7 @@ Script to run the Temperature Emissivity Separation (TES) algorithm for LST esti
 Created on April 15 2021
 @author: Tian Hu at LIST
 
-© 2024 – Luxembourg Institute of Science and Technology
+© 2026 – Luxembourg Institute of Science and Technology
 Authors : Tian Hu (tian.hu@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
