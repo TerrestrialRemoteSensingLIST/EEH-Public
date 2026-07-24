@@ -11,24 +11,32 @@ More information about the model can be found in the papers below:
 4) Hu, Tian, Mallick, Kaniska, Hitzelberger, P., Didry, Y., Boulet, G., Szantoi, Z., et al. (2023). Evaluating European ECOSTRESS Hub Evapotranspiration Products Across a Range of Soil-Atmospheric Aridity and Biomes Over Europe. Water Resources Research, 59(8), e2022WR034132. https://doi.org/https://doi.org/10.1029/2022WR034132
 
 # Inputs
-Input parameters (Order must be the same as below. Example is given in input.txt) are:
-1) filename of ECOSTRESS LST data
-2) directory for ECOSTRESS L1B_GEO
-3) directory for ECOSTRESS cloud mask
-4) directory ofr FVC data
-5) directory for blacksky albedo
-6) directory for whitesky albedo
-7) directory for LULC data
-8) directory for ERA5 data
-9) directory for storing output HDF5 data
+This step used to require a fixed 9-column input.txt config file, processed
+one line per image (see legacy format below). It has been replaced by
+command-line arguments (see Usage below):
+
+1) `--input-files` / `--input-dir` : ECOSTRESS L2_LSTE file(s) to process (TES output)
+2) `--geo-dir`          : directory for ECOSTRESS L1B_GEO
+3) `--cloud-dir`        : directory for ECOSTRESS cloud mask
+4) `--fcover-dir`       : directory for FVC data
+5) `--albedo-mota-dir`  : directory for blacksky and whitesky albedo
+6) `--lulc-dir`         : directory for LULC data
+7) `--era5-dir`         : directory for ERA5 data
+8) `--output-dir`       : directory for storing output HDF5 data
 
 # Usage
 To run the code, type the following in command line:
 
-python myProcessor.py input.txt
-
-For processing each image, all the 9 parameters should be on the same line. Different Lines represent the processings for different images.
-
+python myProcessor.py \
+    --input-files /data/output_tes/EEH2TES_L2_LSTE_..._0000_00.h5 \
+    --geo-dir /data/geo \
+    --cloud-dir /data/cloud \
+    --fcover-dir /data/fcover \
+    --albedo-mota-dir /data/mota \
+    --lulc-dir /data/lulc \
+    --era5-dir /data/era5 \
+    --output-dir /data/output_stic
+    
 # Citation
 The following paper should be cited when using this code:
 
