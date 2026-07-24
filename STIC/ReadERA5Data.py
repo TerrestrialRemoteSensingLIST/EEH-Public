@@ -12,7 +12,8 @@ Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
-#Function for reading the ERA5 data
+#Functions for reading the ERA5 data
+
 import cfgrib
 import numpy as np
 import os

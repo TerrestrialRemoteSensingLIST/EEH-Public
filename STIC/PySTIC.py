@@ -12,7 +12,7 @@ Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
-#Component function of STIC
+# Component function of STIC
 
 import numpy as np
 from Radiation import *

@@ -35,20 +35,10 @@ from LUT import *  # noqa: F401,F403  (kept for parity with original imports)
 
 
 # ---------------------------------------------------------------------------
-# Local file-name caching (replaces S3_cache.cache_S3_with_pattern)
+# Local file-name caching
 # ---------------------------------------------------------------------------
 def build_local_pattern_map(directory, pattern, label=None):
     """
-    Local, pure-Python replacement for cache_S3_with_pattern().
-
-    Original S3 version read a pre-generated list of filenames from
-    '<mount_folder>utils/<name>_S3_cached.txt' and applied re.search(pattern,
-    filename) to each line, using capturing group 1 as the lookup key.
-
-    This function reproduces the exact same key -> filename mapping logic
-    (re.search, group(1)), but scans a local directory directly instead of
-    reading a pre-generated S3 file list.
-
     Parameters
     ----------
     directory : str
@@ -279,6 +269,7 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
     map_geo = build_local_pattern_map(directory_geo, geo_pattern, label='L1B_GEO')
     map_cloud = build_local_pattern_map(directory_cld, cloud_pattern, label='CLOUD')
     map_fvc = build_local_pattern_map(directory_fvc, fcover_pattern, label='FCOVER')
+    
     # NOTE: kept empty, mirroring the original script -- ReadAncillaryData's
     # Read_ALB_DIR/Read_ALB_HEM only use map_albdir1/map_albhem1 in a
     # permanently disabled (`if False:`) legacy branch (pre-2020.7 CGLS

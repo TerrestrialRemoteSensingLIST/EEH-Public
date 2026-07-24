@@ -12,7 +12,8 @@ Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
-#Functions for reading the ancillary CGLS NDVI, albedo_dir, albedo_hem and LULC data
+# Functions for reading the ancillary CGLS NDVI, albedo_dir, albedo_hem and LULC data
+
 import netCDF4 as nc
 import numpy as np
 import os

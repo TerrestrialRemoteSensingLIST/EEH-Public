@@ -12,7 +12,8 @@ Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
-# Functions for read the ECOSTRESS L2_LSTE, L1B_GEO and L2_CLOUD data 
+# Functions for reading the ECOSTRESS L2_LSTE, L1B_GEO and L2_CLOUD data 
+
 import h5py
 import numpy as np
 import os

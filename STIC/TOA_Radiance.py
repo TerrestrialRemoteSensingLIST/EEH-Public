@@ -12,7 +12,7 @@ Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
-#Function for calculating TOA solar radiation
+# Functions for calculating TOA solar radiation
 
 import numpy as np
 
