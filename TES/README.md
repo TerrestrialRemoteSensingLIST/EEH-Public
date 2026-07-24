@@ -28,6 +28,13 @@ python TES_main.py \
     --rttov-installdir /root/rttov \
     --rttov-wrapper-dir /root/rttov/wrapper
 
+# Optional
+--alpha1 / --alpha2 / --alpha3   : override the default TES coefficients
+                                    (0.9895, 0.7994, 0.8572)
+--rttov-lib-preload               : advanced workaround only, preloads a
+                                    compiled RTTOV f2py wrapper .so via
+                                    ctypes before importing pyrttov
+
 
 # Citation
 The following paper should be cited when using this code:
