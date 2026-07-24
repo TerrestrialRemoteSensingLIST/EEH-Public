@@ -33,7 +33,7 @@ from ReadERA5Data import Read_ERA5
 from TES_vec import LST_Estimate
 
 
-# Default TES coefficients (previously the "EEH TES" / A1 set)
+# Default TES coefficients 
 DEFAULT_ALPHA1 = 0.9895
 DEFAULT_ALPHA2 = 0.7994
 DEFAULT_ALPHA3 = 0.8572
@@ -50,13 +50,6 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
                          exclude_substrings=('.xml', '.dmrpp'),
                          cache_dir=None, force_rebuild=False):
     """
-    Local, pure-Python replacement for cache_S3_with_indexes().
-
-    Read_L1B_Data() builds its lookup key as:
-        'ECOv002_L1B_GEO_' (16 chars) + orbit_str (9) + '_' (1)
-        + date_str (8) + 'T' (1) + hour_str+min_str+sec_str (6)
-      = 41 characters total, i.e. filename[0:41].
-
     This function scans a local directory directly and reproduces that
     exact keying. Results are optionally cached to disk (JSON) to avoid
     rescanning slow/networked storage on every run.
