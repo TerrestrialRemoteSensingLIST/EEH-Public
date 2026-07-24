@@ -17,7 +17,6 @@ import h5py
 import numpy as np
 import os
 from datetime import datetime,timedelta
-import wasdi
 
 def timetransform(time):
     t = datetime(2000, 1, 1, 12, 0) + timedelta(seconds=time)
@@ -37,7 +36,7 @@ def substring(string,n):
 def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_cloud_files):
     ########Read LST and LSE data###########
     f_lste = h5py.File(filename_lste, 'r')
-    wasdi.wasdiLog('Opening ECOSTRESS LSTE data finished')
+    print('Opening ECOSTRESS LSTE data finished')
     
     lst = np.array(f_lste['LST']).astype(float)
     #lst = np.array(f_lste['SDS']['LST']).astype(float)
@@ -61,7 +60,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     #Substract the orbit and track information
     orbit_str = filename_lste[-36:-27]
     
-    wasdi.wasdiLog('Reading ECOSTRESS LSTE data finished!')
+    print('Reading ECOSTRESS LSTE data finished!')
     
     #########Read geolocation############
     #Compose the filename of geolocation file
@@ -72,7 +71,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     print(f"Trying to read GEO file:{filename}")
     f_geo = h5py.File(filename, 'r')
     
-    wasdi.wasdiLog('Opening ECOSTRESS Geolocation data finished')
+    print('Opening ECOSTRESS Geolocation data finished')
     lat_eco = np.array(f_geo['Geolocation']['latitude']) #[-90,90]
     lon_eco = np.array(f_geo['Geolocation']['longitude']) #[-180,180]
     alt_eco = np.array(f_geo['Geolocation']['height']) #Unit: m
@@ -90,7 +89,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     f_geo.close()
     del f_geo,lf
     
-    wasdi.wasdiLog('Reading ECOSTRESS geolocation data finished!')
+    print('Reading ECOSTRESS geolocation data finished!')
     
     #########Read cloud mask#########
     #Compose the filename of cloudmask file
@@ -100,7 +99,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     filename = os.path.join(directory_cld,cloud_match)
     f_cld = h5py.File(filename, 'r')
     
-    wasdi.wasdiLog('Opening ECOSTRESS cloud mask finished')
+    print('Opening ECOSTRESS cloud mask finished')
     
     cld_eco = np.array(f_cld['SDS']['Cloud_final'])
     
@@ -117,7 +116,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     f_cld.close()
     del f_cld
     
-    wasdi.wasdiLog('Reading ECOSTRESS cloud mask data finished!')
+    print('Reading ECOSTRESS cloud mask data finished!')
     
     return (lst,lse,lat_eco,lon_eco,alt_eco,watermask,cmask,year,month,day,hour,minute,second,
          date_str,hour_str,min_str,sec_str,orbit_str,prj_wkt)
