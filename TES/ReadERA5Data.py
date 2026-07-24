@@ -8,6 +8,7 @@ Created on April 15 2021
 
 © 2026 – Luxembourg Institute of Science and Technology
 Authors : Tian Hu (tian.hu@list.lu)
+Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
