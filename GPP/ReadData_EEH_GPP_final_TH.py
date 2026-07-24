@@ -1,14 +1,17 @@
 #!/usr/bin/python
 # -*- coding: utf-8 -*-
 """
-Utility functions for the hybrid GPP/WUE model (local version).
+Script to run the hybrid model for GPP and WUE estimation
 Created on May 1 2025
-@author: Ziyu Lin at LIST
-© 2025 - Luxembourg Institute of Science and Technology
-Authors : Ziyu Lin, Kaniska Mallick, Tian Hu (tian.hu@list.lu)
+@author: Ziyu Lin, Kaniska Mallick, Tian Hu, Yoanne Didry at LIST
+
+© 2026 - Luxembourg Institute of Science and Technology
+Authors : Ziyu Lin, Kaniska Mallick, Tian Hu (tian.hu@list.lu), and Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
+# Supporting functions
+
 import os
 import re
 import calendar
