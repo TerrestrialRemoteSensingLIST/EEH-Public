@@ -6,28 +6,41 @@ The hybrid model was initially developed by Lin and Mallick et al . Hu et al. re
 
 More information about the model can be found in the ATBD of the developed model, available on the EEH landing page: https://ecostresshub.eu/
 
-# Inputs
-Input parameters (Order must be the same as below) are:
-1) filename of ECOSTRESS ET data 
-2) directory for storing output HDF5 data
-3) map_cld
-4) map_geo
-5) directory for PAR data 
-6) directory for LAI data
-7) directory for FVC data
-8) directory for ERA5 data
-9) directory for OCO2 data 
-10) directory for LULC data
-11) directory for cloud mask data 
-12) directory for ECOSTRESS L1B_GEO
+#Inputs
+The command-line arguments are listed as below:
 
-# Usage
+--stic-files / --stic-dir : EEH2STIC L3 ET/STIC file(s) to process (STIC output, e.g. EEH2STIC_L3_ET_..._0000_00.h5)
+--output-dir : directory for storing output GPP/WUE HDF5 data
+--geo-dir : directory for ECOSTRESS L1B_GEO
+--cloud-dir : directory for ECOSTRESS cloud mask
+--parh-dir : directory for hourly PAR data (PARin)
+--lai-dir : directory for LAI data (300m, 10-day)
+--fvc-dir : directory for FCOVER data (300m, 10-day)
+--era5-dir : directory for ERA5 data (single level)
+--oco2-dir : directory for OCO-2 XCO2 data
+--glc30-dir : directory for GLC30 land cover tiles
+--lut-file : path to the LookUpTable_LUE_HH_gsFULL-globe.csv file
+
+#Usage
 To run the code, type the following in command line:
 
-python myProcessor.py input.txt
+python GPP_main.py \
+--stic-files /data/output_stic/EEH2STIC_L3_ET_..._0000_00.h5 \
+--geo-dir /data/geo \
+--cloud-dir /data/cloud \
+--parh-dir /data/parh \
+--lai-dir /data/lai \
+--fvc-dir /data/fvc \
+--era5-dir /data/era5 \
+--oco2-dir /data/oco2 \
+--glc30-dir /data/glc30 \
+--lut-file /data/LookUpTable_LUE_HH_gsFULL-globe.csv \
+--output-dir /data/output_gpp
 
-For processing each image, all the 12 parameters should be on the same line. Different lines represent the processings for different images.
+
+To process a whole batch of files (instead of a single file), replace --stic-files with:
+--stic-dir /data/output_stic \
+--stic-pattern "*EEH2STIC_L3_ET*.h5"
 
 
-
-
+--output-dir /data/output_gpp
