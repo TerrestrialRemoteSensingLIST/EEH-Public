@@ -12,23 +12,28 @@ Code licensed under MIT
 SPDX-License-Identifier: MIT
 
 Modified to run fully locally (no WASDI platform dependency):
-- Removed all wasdi.* calls (wasdi.init, wasdi.getPath, wasdi.getSavePath,
-  wasdi.getParameter, wasdi.updateStatus, wasdi.wasdiLog) -> replaced by
-  plain Python (print) and an argparse-based CLI, mirroring run_TES.py.
+- Removed all wasdi.* calls -> replaced by plain Python (print) and an
+  argparse-based CLI, mirroring run_TES.py.
 - Removed cache_S3_with_pattern() / S3_cache.py dependency.
 - Added build_local_pattern_map(), a local, regex-based replacement that
   scans a local directory and builds the same {key: actual_filename}
-  mapping that Read_ECOSTRESS() / Read_Ancillary() expect, so downstream
-  code did not need to change. Uses re.search() (not re.match()), matching
-  the original cache_S3_with_pattern() behaviour.
+  mapping that Read_ECOSTRESS() / Read_Ancillary() expect. Uses re.search()
+  (not re.match()), matching the original cache_S3_with_pattern() behaviour.
+- Performance: directory scans use os.scandir() and check the regex before
+  calling is_file() (avoids a stat() call for every non-matching entry),
+  the 4 independent directory scans (GEO/CLOUD/FCOVER/MOTA) are run in
+  parallel threads, and results are cached to disk as JSON so that slow /
+  networked storage only needs to be scanned once (use
+  --force-rebuild-cache to force a re-scan).
 """
 import argparse
 import glob
+import hashlib
 import json
 import os
 import re
-import sys
 import traceback
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime
 
 import h5py
@@ -38,14 +43,21 @@ from ReadECOSTRESSData import Read_ECOSTRESS
 from ReadAncillaryData import Read_Ancillary
 from ReadERA5Data import Read_ERA5
 from PySTIC import STIC
-from TOA_Radiance import f_TOARadiance, f_ETDaily
-from LUT import *  # noqa: F401,F403  (kept for parity with original imports)
+from TOA_Radiance import f_TOARadiance
+from LUT import f_ETDaily
 
 
 # ---------------------------------------------------------------------------
 # Local file-name caching (replaces S3_cache.cache_S3_with_pattern)
 # ---------------------------------------------------------------------------
-def build_local_pattern_map(directory, pattern, label=None):
+def _cache_file_path(cache_dir, label, directory, pattern):
+    """Build a stable, unique cache filename for a given (directory, pattern) pair."""
+    key = hashlib.sha1(f"{directory}|{pattern}".encode('utf-8')).hexdigest()[:16]
+    safe_label = re.sub(r'[^A-Za-z0-9_-]', '_', label or 'cache')
+    return os.path.join(cache_dir, f'pattern_cache_{safe_label}_{key}.json')
+
+def build_local_pattern_map(directory, pattern, label=None,
+                             cache_dir=None, force_rebuild=False):
     """
     Local, pure-Python replacement for cache_S3_with_pattern().
 
@@ -54,8 +66,15 @@ def build_local_pattern_map(directory, pattern, label=None):
     filename) to each line, using capturing group 1 as the lookup key.
 
     This function reproduces the exact same key -> filename mapping logic
-    (re.search, group(1)), but scans a local directory directly instead of
-    reading a pre-generated S3 file list.
+    (re.search, group(1)), scanning a local directory directly instead of
+    reading a pre-generated S3 file list. Results are optionally cached to
+    disk (JSON) to avoid rescanning slow/networked storage on every run.
+
+    When multiple files share the same key (e.g. successive CGLS FCOVER
+    reprocessing rounds RT0/RT1/RT2/RT6 for the same date, or successive
+    MODIS MCD43C3 production timestamps for the same day), the file whose
+    name is lexicographically greatest is kept deterministically (higher
+    RT round / later production timestamp sorts last as a string).
 
     Parameters
     ----------
@@ -63,35 +82,111 @@ def build_local_pattern_map(directory, pattern, label=None):
         Local folder to scan.
     pattern : str
         Regular expression with exactly one capturing group, applied with
-        re.search() (i.e. matched anywhere in the filename, not anchored).
+        re.search(). Anchor with '$' if you need to match a specific file
+        extension exactly (e.g. to exclude '.h5.xml'/'.h5.dmrpp' sidecars).
     label : str, optional
-        Purely cosmetic, used only for log messages.
+        Cosmetic label used in log messages and in the cache filename.
+    cache_dir : str, optional
+        Directory where a JSON cache of the resulting {key: filename} map
+        is stored/read. If None, no caching is performed (directory is
+        rescanned every call).
+    force_rebuild : bool
+        If True, ignore any existing cache file and rescan the directory.
 
     Returns
     -------
     dict : {captured_group: actual_filename}
     """
+    cache_path = None
+    if cache_dir:
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = _cache_file_path(cache_dir, label, directory, pattern)
+        if not force_rebuild and os.path.isfile(cache_path):
+            try:
+                with open(cache_path, 'r') as f:
+                    file_map = json.load(f)
+                print(f'[{label}] Using cached file-name map '
+                      f'({len(file_map)} entries) from {cache_path}')
+                return file_map
+            except Exception as e:
+                print(f'[{label}] Warning: failed to read cache {cache_path} '
+                      f'({e}) -> rescanning directory')
+
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory not found for '{label}': {directory}")
 
+    print(f'[{label}] Scanning {directory} (this may take a while on slow/networked storage)...')
+
     regex = re.compile(pattern)
+
+    # Sort entries by name first for a deterministic scan order, independent
+    # of the underlying filesystem's (unordered) os.scandir() iteration order.
+    with os.scandir(directory) as it:
+        entries = sorted(it, key=lambda e: e.name)
+
     file_map = {}
-    for fname in sorted(os.listdir(directory)):
-        if not os.path.isfile(os.path.join(directory, fname)):
-            continue
+    for entry in entries:
+        fname = entry.name
+        # Cheap in-memory regex check first: avoids a stat() syscall
+        # (potentially slow on networked/mounted storage) for every
+        # entry that doesn't even match the naming pattern.
         m = regex.search(fname)
         if not m:
             continue
+        if not entry.is_file(follow_symlinks=False):
+            continue
         key = m.group(1)
         if key in file_map:
-            print(f'Warning: duplicate key "{key}" for "{label}" -> keeping '
-                  f'"{file_map[key]}", ignoring "{fname}"')
+            if fname > file_map[key]:
+                print(f'[{label}] Note: preferring more recent "{fname}" over '
+                      f'"{file_map[key]}" for key "{key}"')
+                file_map[key] = fname
+            # else: existing entry is already the lexicographically greatest
+            # (i.e. the most recent reprocessing round / production run) -> keep it silently.
             continue
         file_map[key] = fname
 
     if not file_map:
-        print(f'Warning: no files matching pattern for "{label}" found in {directory}')
+        print(f'[{label}] Warning: no files matching pattern found in {directory}')
+    else:
+        print(f'[{label}] Found {len(file_map)} matching files in {directory}')
+
+    if cache_path:
+        try:
+            with open(cache_path, 'w') as f:
+                json.dump(file_map, f)
+            print(f'[{label}] Cached {len(file_map)} entries to {cache_path}')
+        except Exception as e:
+            print(f'[{label}] Warning: failed to write cache {cache_path}: {e}')
+
     return file_map
+
+def build_all_caches(directory_geo, directory_cld, directory_fvc, directory_alb_mota,
+                      geo_pattern, cloud_pattern, fcover_pattern, mota_pattern,
+                      cache_dir=None, force_rebuild=False):
+    """
+    Build the four independent file-name lookup maps (GEO, CLOUD, FCOVER,
+    MOTA) in parallel threads, since each is a purely I/O-bound directory
+    scan with no dependency on the others.
+    """
+    jobs = {
+        'geo':   (directory_geo, geo_pattern, 'L1B_GEO'),
+        'cloud': (directory_cld, cloud_pattern, 'CLOUD'),
+        'fvc':   (directory_fvc, fcover_pattern, 'FCOVER'),
+        'mota':  (directory_alb_mota, mota_pattern, 'MOTA'),
+    }
+    results = {}
+    with ThreadPoolExecutor(max_workers=len(jobs)) as executor:
+        futures = {
+            name: executor.submit(
+                build_local_pattern_map, directory, pattern, label=label,
+                cache_dir=cache_dir, force_rebuild=force_rebuild)
+            for name, (directory, pattern, label) in jobs.items()
+        }
+        for name, fut in futures.items():
+            results[name] = fut.result()  # re-raises any exception from the thread
+
+    return results['geo'], results['cloud'], results['fvc'], results['mota']
 
 
 # ---------------------------------------------------------------------------
@@ -249,7 +344,8 @@ def generate_hdf5_file(directory_output, ET, H, G, Rn, gah, gsc, Ms, Mrz, ETD,
 def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
              directory_alb_mota, directory_lulc, directory_era5,
              directory_output, geo_pattern, cloud_pattern, fcover_pattern,
-             mota_pattern, error_log_dir='.'):
+             mota_pattern, cache_dir=None, force_rebuild_cache=False,
+             error_log_dir='.'):
     """
     Run the STIC model on a list of ECOSTRESS L2_LSTE files.
 
@@ -257,15 +353,14 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
     ----------
     lste_files : list of str
         Paths to the ECOSTRESS L2_LSTE .h5 files to process
-        (e.g. the EEHTES output of run_TES.py).
+        (e.g. the EEH2TES output of run_TES.py).
     directory_geo, directory_cld : str
         Directories containing the matching L1B_GEO / L2_CLOUD .h5 files.
     directory_fvc : str
         Directory containing the CGLS FCOVER .nc files.
     directory_alb_mota : str
         Directory containing the MCD43C3 (.hdf) albedo files, used for both
-        directional and hemispherical albedo (mirrors the original script,
-        where map_albdir2 == map_albhem2).
+        directional and hemispherical albedo.
     directory_lulc : str
         Directory containing the PROBAV LC100 land-cover raster (fixed
         filename, no lookup pattern needed -- see Read_LULC()).
@@ -275,25 +370,31 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
         Directory where the output ET HDF5 files are written.
     geo_pattern, cloud_pattern, fcover_pattern, mota_pattern : str
         Regex patterns (with one capturing group) used to build the local
-        file-name lookup maps. Defaults match the original ECOSTRESS/CGLS/
-        MODIS naming conventions -- override only if your local filenames
-        differ.
+        file-name lookup maps.
+    cache_dir : str, optional
+        Directory used to persist the file-name lookup maps to disk (JSON),
+        avoiding a costly re-scan of slow/networked storage on every run.
+        If None, caching is disabled and the directories are scanned fresh
+        every time.
+    force_rebuild_cache : bool
+        If True, ignore any existing cache and rescan all four directories.
     error_log_dir : str
         Directory where the execution error JSON log is written, if any.
     """
     map_error = dict()
 
-    print('Building local file-name caches...')
-    map_geo = build_local_pattern_map(directory_geo, geo_pattern, label='L1B_GEO')
-    map_cloud = build_local_pattern_map(directory_cld, cloud_pattern, label='CLOUD')
-    map_fvc = build_local_pattern_map(directory_fvc, fcover_pattern, label='FCOVER')
+    print('Building local file-name caches (parallel scan)...')
+    map_geo, map_cloud, map_fvc, map_albdir2 = build_all_caches(
+        directory_geo, directory_cld, directory_fvc, directory_alb_mota,
+        geo_pattern, cloud_pattern, fcover_pattern, mota_pattern,
+        cache_dir=cache_dir, force_rebuild=force_rebuild_cache,
+    )
     # NOTE: kept empty, mirroring the original script -- ReadAncillaryData's
     # Read_ALB_DIR/Read_ALB_HEM only use map_albdir1/map_albhem1 in a
     # permanently disabled (`if False:`) legacy branch (pre-2020.7 CGLS
     # Albedo_Directional/Albedo_Hemispherical .nc products).
     map_albdir1 = {}
     map_albhem1 = {}
-    map_albdir2 = build_local_pattern_map(directory_alb_mota, mota_pattern, label='MOTA')
     map_albhem2 = map_albdir2
     print('Done caching.')
 
@@ -448,7 +549,7 @@ def build_arg_parser():
     input_group = parser.add_mutually_exclusive_group(required=True)
     input_group.add_argument(
         '--input-files', '-i', nargs='+', metavar='LSTE_FILE',
-        help='One or more ECOSTRESS L2_LSTE .h5 files to process (e.g. EEHTES output).'
+        help='One or more ECOSTRESS L2_LSTE .h5 files to process (e.g. EEH2TES output).'
     )
     input_group.add_argument(
         '--input-dir', metavar='DIR',
@@ -477,15 +578,30 @@ def build_arg_parser():
 
     pattern_group = parser.add_argument_group(
         'File-name matching patterns (override only if your local filenames '
-        'differ from the standard ECOSTRESS/CGLS/MODIS conventions)')
+        'differ from the standard ECOSTRESS/CGLS/MODIS conventions). All '
+        'patterns are anchored to the end of the filename ($) to correctly '
+        'exclude sidecar files such as .xml/.dmrpp.')
     pattern_group.add_argument(
-        '--geo-pattern', default=r'(ECOv002_L1B_GEO.*)_\d{4}_\d{2}\.h5')
+        '--geo-pattern', default=r'(ECOv002_L1B_GEO.*)_\d{4}_\d{2}\.h5$')
     pattern_group.add_argument(
-        '--cloud-pattern', default=r'(ECOv002_L2_CLOUD.*)_\d{4}_\d{2}\.h5')
+        '--cloud-pattern', default=r'(ECOv002_L2_CLOUD.*)_\d{4}_\d{2}\.h5$')
     pattern_group.add_argument(
-        '--fcover-pattern', default=r'c_gls_FCOVER300(?:-RT\d+)?_(\d{8})0000_GLOBE_.*\.nc')
+        '--fcover-pattern', default=r'c_gls_FCOVER300(?:-RT\d+)?_(\d{8})0000_GLOBE_.*\.nc$')
     pattern_group.add_argument(
-        '--mota-pattern', default=r'MCD43C3\.A(\d{7}).*\.hdf')
+        '--mota-pattern', default=r'MCD43C3\.A(\d{7}).*\.hdf$')
+
+    cache_group = parser.add_argument_group('File-name cache (avoids rescanning slow/networked storage)')
+    cache_group.add_argument(
+        '--cache-dir', default=None,
+        help=('Directory used to persist the GEO/CLOUD/FCOVER/MOTA file-name lookup '
+              'maps to disk (JSON). If not given, defaults to '
+              '<output-dir>/.stic_filename_cache. Pass an empty string ("") to '
+              'disable caching entirely and always rescan.')
+    )
+    cache_group.add_argument(
+        '--force-rebuild-cache', action='store_true',
+        help='Ignore any existing file-name cache and rescan all directories.'
+    )
 
     parser.add_argument('--error-log-dir', default='.',
                          help='Directory to write the execution error JSON log to, if any.')
@@ -506,6 +622,13 @@ def main(argv=None):
 
     os.makedirs(args.output_dir, exist_ok=True)
 
+    if args.cache_dir is None:
+        cache_dir = os.path.join(args.output_dir, '.stic_filename_cache')
+    elif args.cache_dir == '':
+        cache_dir = None  # caching explicitly disabled
+    else:
+        cache_dir = args.cache_dir
+
     run_STIC(
         lste_files=lste_files,
         directory_geo=args.geo_dir,
@@ -519,6 +642,8 @@ def main(argv=None):
         cloud_pattern=args.cloud_pattern,
         fcover_pattern=args.fcover_pattern,
         mota_pattern=args.mota_pattern,
+        cache_dir=cache_dir,
+        force_rebuild_cache=args.force_rebuild_cache,
         error_log_dir=args.error_log_dir,
     )
 
