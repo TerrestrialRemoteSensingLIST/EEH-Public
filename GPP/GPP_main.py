@@ -3,39 +3,16 @@
 """
 Script to run the hybrid model for GPP and WUE estimation
 Created on May 1 2025
-@author: Ziyu Lin at LIST
-© 2025 - Luxembourg Institute of Science and Technology
-Authors : Ziyu Lin, Kaniska Mallick, Tian Hu (tian.hu@list.lu)
+@author: Ziyu Lin, Kaniska Mallick, Tian Hu, Yoanne Didry at LIST
+
+© 2026 - Luxembourg Institute of Science and Technology
+Authors : Ziyu Lin, Kaniska Mallick, Tian Hu (tian.hu@list.lu), and Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
-
-Modified to run fully locally (no WASDI platform dependency):
-- Removed all wasdi.* calls -> replaced by plain Python (print) and an
-  argparse-based CLI, mirroring STIC_main.py / TES_main.py.
-- Removed cache_S3_with_pattern() / cache_S3_simple() / S3_cache.py
-  dependency:
-    * cache_S3_with_pattern() -> build_local_pattern_map() (local, regex
-      based directory scan, {captured_group: filename} mapping).
-    * cache_S3_simple()       -> list_local_files_cached() (local, glob
-      based directory scan, returns a plain sorted list of full paths).
-- Performance: directory scans use os.scandir() and check the
-  pattern/fnmatch BEFORE calling is_file() (avoids a stat() syscall for
-  every non-matching entry on slow/networked storage); the 8 independent
-  directory scans (GEO, CLOUD, PARH, LAI, FVC, ERA5, OCO2, GLC30) are run
-  in parallel threads via build_all_caches(); results are cached to disk
-  as JSON so that slow/networked storage only needs to be scanned once
-  (use --force-rebuild-cache to force a re-scan).
-- GEO/CLOUD default patterns are anchored with '$' to correctly exclude
-  sidecar files (.xml, .dmrpp, etc.) that would otherwise collide with the
-  real .h5 file under the same lookup key.
-
-NOTE: the original WASDI script also cached MOTA (blue-sky albedo) and CI
-(clumping index) file listings, but never actually passed them to
-run_GPP() -- they were unused dead code. They are intentionally NOT
-reproduced here. Reintroduce them (following the same
-list_local_files_cached() pattern) if a future version of the model
-needs them.
 """
+
+# Main function
+
 import argparse
 import fnmatch
 import glob
