@@ -5,21 +5,10 @@ Script to run the Temperature Emissivity Separation (TES) algorithm for LST esti
 Created on April 15 2021
 @author: Tian Hu at LIST
 
-Modified to run fully locally (no WASDI platform / no S3 access required):
-- Removed all wasdi.* calls -> replaced by an argparse-based CLI and print().
-- Removed cache_S3_with_indexes() / S3_cache.py dependency.
-- Added build_local_geo_map(), which scans a local directory of GEO (.h5)
-  files and builds the same {canonical_name: actual_filename} mapping that
-  Read_L1B_Data() expects.
-- Made the RTTOV installation/wrapper/coefficient paths fully dynamic
-  (forwarded to AtmCorrection.runRTTOV() via CLI arguments).
-- Adapted to the single-coefficient-set variant of the algorithm (no more
-  A1/A2/A3 loop): one LST/emissivity estimate per input file, using a single
-  (alpha1, alpha2, alpha3) triplet exposed as optional CLI arguments.
-- The manual ctypes preload of the RTTOV f2py wrapper (previously hardcoded
-  to a relative './lib/rttov_wrapper_f2py.so' path) is now optional and
-  path-configurable via --rttov-lib-preload (disabled by default), since
-  pyrttov normally loads its own compiled wrapper on import.
+© 2026 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu)
+Code licensed under MIT
+SPDX-License-Identifier: MIT
 """
 import argparse
 import glob
