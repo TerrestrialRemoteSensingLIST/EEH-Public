@@ -3,34 +3,35 @@
 """
 Script to run the STIC model for ET estimation
 
-Created on March 18 2021
+Created on September 1 2024
 @author: Tian Hu at LIST
 
-© 2022 – Luxembourg Institute of Science and Technology
+© 2024 – Luxembourg Institute of Science and Technology
 Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
-#Main function for the STIC model
+#Main function for the STIC model and temporal upscaling
 import sys
 import os
 import numpy as np
 import h5py
+from datetime import datetime
 #from osgeo import gdal, osr
 from ReadECOSTRESSData import *
 from ReadAncillaryData import *
 from ReadERA5Data import * 
 from PySTIC import *
+from TOA_Radiance import *
+from LUT import *
 
-#import cache function
-sys.path.insert(0,'../utils')
-#sys.path.insert(0,'/root/algos/eeh/utils')
 from S3_cache import cache_S3_with_pattern
-from S3_cache import cache_S3_with_indexes
 
 import traceback
 import json 
+
+import wasdi
 
 #Parse the config file to obtain all the directories
 def parse_input_config(config_file):
@@ -80,13 +81,32 @@ def generate_raster_file(driver, filename, data, x_dim, y_dim,
         del raster
 
     except Exception:
-        print('Failed to generate file {}'.format(filename))
+        wasdi.wasdiLog('Failed to generate file {}'.format(filename))
 #def generate_raster_file
 
+def adjust_lulc(lulc):
+    lulc[(lulc == 80) | (lulc == 200)] = 0 # water
+    lulc[(lulc == 111) | (lulc == 121)] = 1 # evergreen conifer
+    lulc[(lulc == 112) | (lulc == 122)] = 1 # evergreen broadleaf
+    lulc[(lulc == 113) | (lulc == 123)] = 1 # deciduous conifer
+    lulc[(lulc == 114) | (lulc == 124)] = 1 # deciduous broadleaf
+    lulc[(lulc == 115) | (lulc == 116) | (lulc == 125) | (lulc == 126)] = 1 # mixed forest
+    lulc[lulc == 20] = 6 # woody savanna
+    lulc[(lulc == 30) | (lulc == 100)] = 3 # grassland
+    lulc[lulc == 90] = 5 # wetland
+    lulc[lulc == 40] = 2 # cropland
+    lulc[lulc == 50] = 8 # urban
+    lulc[lulc == 70] = 9 # snow
+    lulc[lulc == 60] = 7 # barren surfaces
+    lulc[lulc == 0] = 0 # exclusion of invalid pixels
+
+    return lulc
+
 #Output the estimates to HDF5 file
-def generate_hdf5_file(directory_output,ET,H,G,Rn,orbit_str,date_str,hour_str,min_str,sec_str):     
-    base_filename = 'EEHSTIC_L3_ET_' + orbit_str + '_' + date_str + 'T' + hour_str + min_str + sec_str + '_0000_00.h5'
+def generate_hdf5_file(directory_output,ET,H,G,Rn,gah,gsc,Ms,Mrz,ETD,orbit_str,date_str,hour_str,min_str,sec_str):     
+    base_filename = 'EEH2STIC_L3_ET_' + orbit_str + '_' + date_str + 'T' + hour_str + min_str + sec_str + '_0000_00.h5'
     filename = os.path.join(directory_output,base_filename)
+    wasdi.wasdiLog("Writing output to : "+filename)
     f_h5 = h5py.File(filename,'w')
     
     dset = f_h5.create_dataset('LE',data = np.float32(ET))
@@ -129,160 +149,232 @@ def generate_hdf5_file(directory_output,ET,H,G,Rn,orbit_str,date_str,hour_str,mi
     dset.attrs['scale_factor'] = 1
     dset.attrs['add_offset'] = 0
 
+    dset = f_h5.create_dataset('gah',data = np.float32(gah))
+    dset.attrs['long_name'] = 'Aerodynamic conductance'
+    dset.attrs['units'] = 'm.s-1'
+    dset.attrs['format'] = 'scaled'
+    dset.attrs['coordsys'] = 'cartesian'
+    dset.attrs['valid_range'] = np.array([0,1])
+    dset.attrs['fill_value'] = -9999
+    dset.attrs['scale_factor'] = 1
+    dset.attrs['add_offset'] = 0
+
+    dset = f_h5.create_dataset('gsc',data = np.float32(gsc))
+    dset.attrs['long_name'] = 'Surface conductance'
+    dset.attrs['units'] = 'm.s-1'
+    dset.attrs['format'] = 'scaled'
+    dset.attrs['coordsys'] = 'cartesian'
+    dset.attrs['valid_range'] = np.array([0,1])
+    dset.attrs['fill_value'] = -9999
+    dset.attrs['scale_factor'] = 1
+    dset.attrs['add_offset'] = 0
+
+    dset = f_h5.create_dataset('Ms',data = np.float32(Ms))
+    dset.attrs['long_name'] = 'Water stress'
+    dset.attrs['units'] = 'unitless'
+    dset.attrs['format'] = 'scaled'
+    dset.attrs['coordsys'] = 'cartesian'
+    dset.attrs['valid_range'] = np.array([0,1])
+    dset.attrs['fill_value'] = -9999
+    dset.attrs['scale_factor'] = 1
+    dset.attrs['add_offset'] = 0
+
+    dset = f_h5.create_dataset('Mrz',data = np.float32(Mrz))
+    dset.attrs['long_name'] = 'Water stress root zone'
+    dset.attrs['units'] = 'unitless'
+    dset.attrs['format'] = 'scaled'
+    dset.attrs['coordsys'] = 'cartesian'
+    dset.attrs['valid_range'] = np.array([0,1])
+    dset.attrs['fill_value'] = -9999
+    dset.attrs['scale_factor'] = 1
+    dset.attrs['add_offset'] = 0
+
+    dset = f_h5.create_dataset('ETD',data = np.float32(ETD))
+    dset.attrs['long_name'] = 'Daily ET'
+    dset.attrs['units'] = 'mm.day-1'
+    dset.attrs['format'] = 'scaled'
+    dset.attrs['coordsys'] = 'cartesian'
+    dset.attrs['valid_range'] = np.array([0,2000])
+    dset.attrs['fill_value'] = -9999
+    dset.attrs['scale_factor'] = 1
+    dset.attrs['add_offset'] = 0
+
     f_h5.close() 
 
-    print("STIC Model Running Completed")
-    return
+    wasdi.wasdiLog("STIC Model Running Completed")
     
-def run_STIC_from_config_file(config_file):
-    (config_data,row,col,ready) = parse_input_config(config_file)
+    return base_filename
+    
+def run_STIC_from_wasdi_config_file():
+ 
+    #For local testing only
+    #wasdi.getPath('ecostress_fast/L1B_GEO_V002/ECOv002_L1B_GEO_00478_013_20180806T133126_0712_04.h5')
+    #wasdi.getPath('ecostress_fast/L2_CLOUD_V002/ECOv002_L2_CLOUD_00478_013_20180806T133126_0712_04.h5')
+    #wasdi.getPath('ecostress_fast/FCOVER/c_gls_FCOVER300_201800600000_GLOBE_PROBAV_V1.0.1.nc')
+    #wasdi.getPath('ecostress_fast/Albedo_Directional/c_gls_ALDH_201808060000_GLOBE_PROBAV_V1.5.1.nc')
+    #wasdi.getPath('ecostress_fast/Albedo_Hemispherical/c_gls_ALBH_201808060000_GLOBE_PROBAV_V1.5.1.nc')
+    #wasdi.getPath('ecostress_fast/LULC/PROBAV_LC100_global_v3.0.1_2018-conso_Discrete-Classification-map_EPSG-4326.tif')
+    #wasdi.getPath('ecostress_fast/ERA5/era5_single_levels-2018_08_06_14:00.grib')
+    #wasdi.getPath('ecostress_fast/ERA5/era5_single_levels-2018_08_06_15:00.grib')
+    #wasdi.getPath('ecostress_fast/ERA5/era5_single_levels-2018_08_06_11:00.grib')
+    ###wasdi.getPath('ecostress_fast/ERA5/era5_single_levels-2018_08_06_12:00.grib')
+    #wasdi.getPath('ecostress_fast/MOTA/MCD43C3.A2018218.061.2021347183125.hdf')
 
-    #Cache the GEO and CLOUD file name
-    #map_geo = cache_S3_with_indexes('L1B_GEO',0,43)
-    map_geo = cache_S3_with_pattern('L1B_GEO_V002','/ECOSTRESS_RW/',r'(ECOv002_L1B_GEO.*)_\d{4}_\d{2}.h5')
-    #map_fvc = cache_S3_with_pattern('FCOVER')
-    map_fvc = cache_S3_with_pattern('FCOVER','/ECOSTRESS_RW/',r'c_gls_FCOVER300(?:-RT\d+)?_(\d{8})0000_GLOBE_.*\.nc')
-    #map_albdir1 = cache_S3_with_indexes('Albedo_Directional',0,18)
-    map_albdir2 = cache_S3_with_pattern('MOTA','/ECOSTRESS_RW/',r'MCD43C3\.A(\d{7}).*.hdf')
-    #map_albdir2 = cache_S3_with_indexes('MOTA',9,16)
-   # map_albhem1 = cache_S3_with_indexes('Albedo_Hemispherical',0,18)
-    #map_albhem2 = cache_S3_with_indexes('MOTA',9,16)
-    map_albhem2 = map_albdir2
+
+    #Cache the GEO and CLOUD file name from the working directory
+    #ECOv002_L1B_GEO_00424_001_20180803T011700_0712_04.h5
+    map_geo = cache_S3_with_pattern('L1B_GEO',wasdi.getSavePath()+'ecostress_fast/',r'(ECOv002_L1B_GEO.*)_\d{4}_\d{2}.h5')
     
-    print('Done caching ')
+    #TODO : better handling
+    map_cloud   = cache_S3_with_pattern('CLOUD',wasdi.getSavePath()+'ecostress_fast/',r'(ECOv002_L2_CLOUD.*)_\d{4}_\d{2}.h5')
+    map_fvc = cache_S3_with_pattern('FCOVER',wasdi.getSavePath()+'ecostress_fast/',r'c_gls_FCOVER300(?:-RT\d+)?_(\d{8})0000_GLOBE_.*\.nc')
+    #c_gls_FCOVER300_201908200000_GLOBE_PROBAV_V1.0.1.nc or c_gls_FCOVER300-RT6_202407310000_GLOBE_OLCI_V1.1.2.nc
+    map_albdir1 = {}
+    map_albhem1 = {}
+    map_albdir2 = cache_S3_with_pattern('MOTA',wasdi.getSavePath()+'ecostress_fast/',r'MCD43C3\.A(\d{7}).*.hdf')
+    map_albhem2 = map_albdir2
+
+    wasdi.wasdiLog('Done caching ')
     #done cashing
 
     map_error = dict()
 
-    if ready == 1:
-        for i in range(row):
-            filename_lste = config_data[i,0]
-            directory_geo = config_data[i,1]
-            directory_cld = config_data[i,2]
-            directory_fvc = config_data[i,3]
-            directory_alb_dir = config_data[i,4]
-            directory_alb_hem = config_data[i,5]
-            directory_lulc = config_data[i,6]
-            directory_era5 = config_data[i,7]
-            directory_output = config_data[i,8]
+    lste_files = wasdi.getParameter('L2_LSTE_FILES') #EEHTES folder i.e. ecostress_fast/EEH2/EEHTES/
+    row = len(lste_files)
 
-            print('Run STIC model on ECOSTRESS data ' + filename_lste)           
-            
-            # Read the ECOSTRESS data
-            (lst_eco,lse_eco,lat_eco,lon_eco,_,watermask,cloudmask,year,month,day,hour,minute,second,
-             date_str,hour_str,min_str,sec_str,orbit_str,_) = Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo)
-            
-            # Converting from K to Celsus degree
-            lst_eco = lst_eco - 273.15
-            
-            # Converting time from UTM to local solar time (in seconds)
-            time_delta = lon_eco/15.
-            time_ls = float(hour) + float(minute)/60. + float(second)/3600. + time_delta
-            time_ls[time_ls < 0] += 24
-            time_ls[time_ls >= 24] = time_ls[time_ls >= 24] % 24
-            time_ls = time_ls*3600            
-            
-            # Mask out pixels covered by cloud
-            lst_eco[cloudmask == 1] = np.nan
-            lse_eco[cloudmask == 1] = np.nan
-            
-            # Mask out pixels covered by water
-            lst_eco[watermask == 1] = np.nan
-            lse_eco[watermask == 1] = np.nan
-            
-            print('Reading ECOSTRESS data finished!')
-            
-            # Read and interpolate the ancillary data based on ECOSTRESS geolocation and observation time
-            (fvc,alb_dir,alb_hem,lulc) = Read_Ancillary(directory_fvc,directory_alb_dir,directory_alb_hem,directory_lulc,
-                                           lat_eco,lon_eco,year,month,day,map_fvc,map_albdir1,map_albdir2,map_albhem1,map_albhem2)
-            
-            print('Reading ancillary CGLS data finished!')
-            
-            (t_s,rh_s,_,sr_dir,sr_dif) = Read_ERA5(directory_era5,lat_eco,lon_eco,year,month,day,hour,minute,second)
-            
-            t_s = t_s - 273.15 # Converting from K to Celsus degree
-            rh_s = rh_s*100 # Converting from 0-1 to percentage            
-               
-            print('Reading ERA5 data finished!')
-            
-            try:
-                (RN_STIC,G_STIC,H_STIC,LE_STIC,_,gsc_STIC,
-                        _,Ms_STIC,Mrz_STIC,converged) = STIC(lst_eco,lse_eco,t_s,rh_s,sr_dir,
-                                                                sr_dif,alb_dir,alb_hem,fvc,time_ls)
+    wasdi.updateStatus("RUNNING", 0)
+    for i in range(row):
 
-                print('Running the STIC model finished!')
-                
-    #             #Extract the samples for testing the MATLAB version of STIC
-    #             lst_eco1 = lst_eco[converged]
-    #             lse_eco1 = lse_eco[converged]
-    #             t_s1 = t_s[converged]
-    #             rh_s1 = rh_s[converged]
-    #             sr_dir1 = sr_dir[converged]
-    #             sr_dif1 = sr_dif[converged]
-    #             alb_dir1 = alb_dir[converged]
-    #             alb_hem1 = alb_hem[converged]
-    #             fvc1 = fvc[converged]
-    #             time_ls1 = time_ls[converged]
-    #             RN_STIC1 = RN_STIC[converged]
-    #             G_STIC1 = G_STIC[converged]
-    #             H_STIC1 = H_STIC[converged]
-    #             LE_STIC1 = LE_STIC[converged]
-                
-    #             index = np.random.randint(lst_eco1.shape[0],size=(500))
-    #             data = np.transpose(np.array([lst_eco1[index],lse_eco1[index],t_s1[index],rh_s1[index],sr_dir1[index],
-    #                                 sr_dif1[index],alb_dir1[index],alb_hem1[index],fvc1[index],time_ls1[index],
-    #                                          RN_STIC1[index],G_STIC1[index],H_STIC1[index],LE_STIC1[index]]))
-    #             outputname = '/home/tian/ecostress/data/temp/STIC/data.txt'
-    #             np.savetxt(outputname,data,fmt='%12.6f')          
-                
-                #Mask out the invalid pixels
-                RN_STIC[np.isnan(RN_STIC)] = -9999
-                G_STIC[np.isnan(G_STIC)] = -9999
-                H_STIC[np.isnan(H_STIC)] = -9999
-                LE_STIC[np.isnan(LE_STIC)] = -9999
-                
-                #Mask out the non-converged pixels
-                RN_STIC[~converged] = -9999
-                G_STIC[~converged] = -9999
-                H_STIC[~converged] = -9999
-                LE_STIC[~converged] = -9999
-                
-                #Mask out the night-time pixels
-                G_STIC[RN_STIC < 0] = -9999
-                H_STIC[RN_STIC < 0] = -9999
-                LE_STIC[RN_STIC < 0] = -9999
-                RN_STIC[RN_STIC < 0] = -9999
-                
-                #Mask out ET for certain land surface types
-                LE_STIC[(lulc == 50) | (lulc == 60) | (lulc == 70)] = -9999
-                H_STIC[(lulc == 50) | (lulc == 60) | (lulc == 70)] = -9999
-                G_STIC[(lulc == 50) | (lulc == 60) | (lulc == 70)] = -9999
-                RN_STIC[(lulc == 50) | (lulc == 60) | (lulc == 70)] = -9999
-                
-                # Output the variables in HDF5 file
-                generate_hdf5_file(directory_output,LE_STIC,H_STIC,G_STIC,RN_STIC,orbit_str,
-                                date_str,hour_str,min_str,sec_str)
-                
-                print('Outputting to HDF5 file finished')
-            except Exception as err:
-                print(str(err))
-                traceback.print_exc()
-                print('Error -> stopping there')
-                map_error[filename_lste] = traceback.format_exc()
-    else:
-        message = 'ERROR!! Check the input directories!'
-        raise Exception(message)
+        filename_lste = wasdi.getPath(lste_files[i])
+
+        directory_geo = wasdi.getSavePath()+wasdi.getParameter('L1B_GEO_PATH')
+        directory_cld = wasdi.getSavePath()+wasdi.getParameter('L2_CLOUD_PATH')
+        directory_fvc = wasdi.getSavePath()+wasdi.getParameter('FCOVER_PATH')
+        directory_alb_dir = wasdi.getSavePath()+wasdi.getParameter('ALBEDODIR_PATH')
+        directory_alb_hem = wasdi.getSavePath()+wasdi.getParameter('ALBEDOHEM_PATH')
+        directory_lulc = wasdi.getSavePath()+wasdi.getParameter('LULC_PATH')
+        directory_era5 = wasdi.getSavePath()+wasdi.getParameter('ERA5_PATH')
+        directory_output = wasdi.getSavePath()+wasdi.getParameter('STIC_OUTPUT')
+
+        wasdi.wasdiLog('Run STIC model on ECOSTRESS data ' + filename_lste)           
+        
+        # Read the ECOSTRESS data
+        (lst_eco,lse_eco,lat_eco,lon_eco,_,watermask,cloudmask,year,month,day,hour,minute,second,
+         date_str,hour_str,min_str,sec_str,orbit_str,_) = Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo,map_cloud)
+        
+        # Converting from K to Celsus degree
+        lst_eco = lst_eco - 273.15
+
+        # Calculating day of year and decimal time 
+        #date = datetime(float(year),float(month),float(day))
+        date = datetime(int(year),int(month),int(day))
+        doy = date.timetuple().tm_yday
+        time_decimal = float(hour) + float(minute)/60. + float(second)/3600
+        
+        # Converting time from UTM to local solar time (in seconds)
+        time_delta = lon_eco/15.
+        time_ls = float(hour) + float(minute)/60. + float(second)/3600. + time_delta
+        time_ls[time_ls < 0] += 24
+        time_ls[time_ls >= 24] = time_ls[time_ls >= 24] % 24
+        time_ls = time_ls*3600            
+        
+        # Mask out pixels covered by cloud
+        lst_eco[cloudmask == 1] = np.nan
+        lse_eco[cloudmask == 1] = np.nan
+        
+        # Mask out pixels covered by water
+        lst_eco[watermask == 1] = np.nan
+        lse_eco[watermask == 1] = np.nan
+        
+        wasdi.wasdiLog('Reading ECOSTRESS data finished!')
+        
+        # Read and interpolate the ancillary data based on ECOSTRESS geolocation and observation time
+        (fvc,alb_dir,alb_hem,lulc) = Read_Ancillary(directory_fvc,directory_alb_dir,directory_alb_hem,directory_lulc,
+                                       lat_eco,lon_eco,year,month,day,map_fvc,map_albdir1,map_albdir2,map_albhem1,map_albhem2)
+        lulc_adjusted = adjust_lulc(lulc)
+        wasdi.wasdiLog('Reading ancillary CGLS data finished!')
+        
+        (t_s,rh_s,_,sr_dir,sr_dif,ta_max) = Read_ERA5(directory_era5,lat_eco,lon_eco,year,month,day,hour,minute,second)
+        
+        t_s = t_s - 273.15 # Converting from K to Celsus degree
+        rh_s = rh_s*100 # Converting from 0-1 to percentage            
+           
+        wasdi.wasdiLog('Reading ERA5 data finished!')
+        
+        try:
+            (RN_STIC,G_STIC,H_STIC,LE_STIC,gah_STIC,gsc_STIC,
+                    T0_STIC,Ms_STIC,Mrz_STIC,converged,Lin,Lout,Lnet,Sin,Sout) = STIC(lst_eco,lse_eco,t_s,rh_s,sr_dir,
+                                                            sr_dif,alb_dir,alb_hem,fvc,time_ls)
+
+            wasdi.wasdiLog('Running the STIC model finished!')
+
+            #Mask out the invalid pixels
+            RN_STIC[np.isnan(RN_STIC)] = -9999
+            G_STIC[np.isnan(G_STIC)] = -9999
+            H_STIC[np.isnan(H_STIC)] = -9999
+            LE_STIC[np.isnan(LE_STIC)] = -9999
+            gah_STIC[np.isnan(gah_STIC)] = -9999
+            gsc_STIC[np.isnan(gsc_STIC)] = -9999
+            Ms_STIC[np.isnan(Ms_STIC)] = -9999
+            Mrz_STIC[np.isnan(Mrz_STIC)] = -9999
+            
+            #Mask out the non-converged pixels
+            RN_STIC[~converged] = -9999
+            G_STIC[~converged] = -9999
+            H_STIC[~converged] = -9999
+            LE_STIC[~converged] = -9999
+            gah_STIC[~converged] = -9999
+            gsc_STIC[~converged] = -9999
+            Ms_STIC[~converged] = -9999
+            Mrz_STIC[~converged] = -9999
+            
+            #Mask out the night-time pixels
+            G_STIC[RN_STIC < 0] = -9999
+            H_STIC[RN_STIC < 0] = -9999
+            LE_STIC[RN_STIC < 0] = -9999
+            RN_STIC[RN_STIC < 0] = -9999
+            gah_STIC[RN_STIC < 0] = -9999
+            gsc_STIC[RN_STIC < 0] = -9999
+            Ms_STIC[RN_STIC < 0] = -9999
+            Mrz_STIC[RN_STIC < 0] = -9999
+            
+            #Mask out ET for non-vegetated land surface types
+            LE_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+            H_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+            G_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+            RN_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+            gah_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+            gsc_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+            Ms_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+            Mrz_STIC[(lulc_adjusted < 1) | (lulc_adjusted > 6)] = -9999
+
+            #Calculate daily ET from the instantaneous estimtes
+            (RgTOAiMJ,RgTOAInt) = f_TOARadiance(doy,time_decimal,lat_eco,lon_eco)
+            LE_STIC1 = LE_STIC * 30 * 60 / (2264.76*1e3) #Unit conversion: mm
+            ET_DLY = f_ETDaily(LE_STIC1,float(hour),t_s,ta_max,Lin,Lout,Sin,Sout,RgTOAiMJ,RgTOAInt,lulc_adjusted)
+            ET_DLY[LE_STIC == -9999] = -9999
+            
+            # Output the variables in HDF5 file
+            generate_hdf5_file(directory_output,LE_STIC,H_STIC,G_STIC,RN_STIC,gah_STIC,gsc_STIC,Ms_STIC,Mrz_STIC,ET_DLY,
+                               orbit_str,date_str,hour_str,min_str,sec_str)
+            
+            wasdi.wasdiLog('Outputting to HDF5 file finished')
+        except Exception as err:
+            traceback.print_exc()
+            wasdi.wasdiLog('Error -> stopping there')
+            map_error[filename_lste] = traceback.format_exc()
     
     if map_error:
         pid = str(os.getpid())
         with open('execution_'+pid+'_errors.txt', 'w') as file:
             file.write(json.dumps(map_error))
  
+def run():
+    wasdi.wasdiLog("Starting STIC algorithm")
+    run_STIC_from_wasdi_config_file()
+    wasdi.updateStatus("DONE",100)
+    wasdi.wasdiLog("STIC algorithm done")
+
 if __name__ == '__main__':
-    args = sys.argv
-    if len(args) > 1:
-        config_file = args[1]
-        run_STIC_from_config_file(config_file)
-    else:
-        message = 'ERROR!! Configuration data required!'
-        raise Exception(message) 
+    wasdi.init("./config.json")
+    run()
