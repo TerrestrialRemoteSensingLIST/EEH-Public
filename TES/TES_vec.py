@@ -1,4 +1,19 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+Script to run the Temperature Emissivity Separation (TES) algorithm for LST estimation
+
+Created on April 15 2021
+@author: Tian Hu at LIST
+
+© 2024 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
+Code licensed under MIT
+SPDX-License-Identifier: MIT
+"""
+
 # Temperature and Emissivity Separation algorithm
+
 import numpy as np
 
 def nem(e_max, ls2, ls4, ls5, ld2, ld4, ld5):
