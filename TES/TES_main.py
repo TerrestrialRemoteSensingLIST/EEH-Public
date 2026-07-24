@@ -11,13 +11,12 @@ Authors : Tian Hu (tian.hu@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
-
-# Main function
-
 import argparse
 import glob
+import hashlib
 import json
 import os
+import re
 import traceback
 
 import cv2
@@ -37,8 +36,16 @@ DEFAULT_ALPHA2 = 0.7994
 DEFAULT_ALPHA3 = 0.8572
 
 
+def _cache_file_path(cache_dir, label, directory, key_index1, key_index2):
+    """Build a stable, unique cache filename for a given (directory, key slice) pair."""
+    key = hashlib.sha1(f"{directory}|{key_index1}|{key_index2}".encode('utf-8')).hexdigest()[:16]
+    safe_label = re.sub(r'[^A-Za-z0-9_-]', '_', label or 'cache')
+    return os.path.join(cache_dir, f'geo_cache_{safe_label}_{key}.json')
+
+
 def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
-                         exclude_substrings=('.xml', '.dmrpp')):
+                         exclude_substrings=('.xml', '.dmrpp'),
+                         cache_dir=None, force_rebuild=False):
     """
     Local, pure-Python replacement for cache_S3_with_indexes().
 
@@ -48,7 +55,11 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
       = 41 characters total, i.e. filename[0:41].
 
     This function scans a local directory directly and reproduces that
-    exact keying.
+    exact keying. Results are optionally cached to disk (JSON) to avoid
+    rescanning slow/networked storage on every run.
+
+    When multiple files share the same key, the file whose name is
+    lexicographically greatest is kept deterministically.
 
     Parameters
     ----------
@@ -59,28 +70,74 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
         the lookup key. Defaults (0, 41) match the ECOSTRESS GEO naming
         convention and Read_L1B_Data()'s key construction.
     exclude_substrings : tuple of str
-        Files containing any of these substrings are skipped.
+        Files containing any of these substrings are skipped before any
+        further processing (filters out sidecar metadata files such as
+        .xml/.dmrpp).
+    cache_dir : str, optional
+        Directory used to persist the resulting {key: filename} map to
+        disk (JSON). If None, no caching is performed (directory is
+        rescanned every call).
+    force_rebuild : bool
+        If True, ignore any existing cache file and rescan the directory.
 
     Returns
     -------
     dict : {filename[key_index1:key_index2]: actual_filename}
     """
+    cache_path = None
+    if cache_dir:
+        os.makedirs(cache_dir, exist_ok=True)
+        cache_path = _cache_file_path(cache_dir, 'GEO', directory_geo, key_index1, key_index2)
+        if not force_rebuild and os.path.isfile(cache_path):
+            try:
+                with open(cache_path, 'r') as f:
+                    geo_map = json.load(f)
+                print(f'[GEO] Using cached file-name map ({len(geo_map)} entries) from {cache_path}')
+                return geo_map
+            except Exception as e:
+                print(f'[GEO] Warning: failed to read cache {cache_path} ({e}) -> rescanning directory')
+
     if not os.path.isdir(directory_geo):
         raise FileNotFoundError(f"GEO directory not found: {directory_geo}")
+
+    print(f'[GEO] Scanning {directory_geo} (this may take a while on slow/networked storage)...')
+
+    # Sort entries by name first for a deterministic scan order, independent
+    # of the underlying filesystem's (unordered) os.scandir() iteration order.
+    with os.scandir(directory_geo) as it:
+        entries = sorted(it, key=lambda e: e.name)
+
     geo_map = {}
-    for fname in sorted(os.listdir(directory_geo)):
+    for entry in entries:
+        fname = entry.name
+        # Cheap in-memory string checks first: avoids a stat() syscall
+        # (potentially slow on networked/mounted storage) for every entry
+        # that is trivially excluded anyway.
         if any(sub in fname for sub in exclude_substrings):
             continue
-        if not os.path.isfile(os.path.join(directory_geo, fname)):
+        if not entry.is_file(follow_symlinks=False):
             continue
         key = fname[key_index1:key_index2]
         if key in geo_map:
-            print(f'Warning: duplicate GEO key "{key}" -> keeping "{geo_map[key]}", '
-                  f'ignoring "{fname}"')
+            if fname > geo_map[key]:
+                print(f'[GEO] Note: preferring "{fname}" over "{geo_map[key]}" for key "{key}"')
+                geo_map[key] = fname
             continue
         geo_map[key] = fname
+
     if not geo_map:
-        print(f'Warning: no GEO files found in {directory_geo}')
+        print(f'[GEO] Warning: no GEO files found in {directory_geo}')
+    else:
+        print(f'[GEO] Found {len(geo_map)} matching files in {directory_geo}')
+
+    if cache_path:
+        try:
+            with open(cache_path, 'w') as f:
+                json.dump(geo_map, f)
+            print(f'[GEO] Cached {len(geo_map)} entries to {cache_path}')
+        except Exception as e:
+            print(f'[GEO] Warning: failed to write cache {cache_path}: {e}')
+
     return geo_map
 
 
@@ -130,7 +187,8 @@ def generate_hdf5_file(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa
 def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             rttov_installdir, rttov_wrapper_dir, rttov_coef_file=None,
             alpha1=DEFAULT_ALPHA1, alpha2=DEFAULT_ALPHA2, alpha3=DEFAULT_ALPHA3,
-            rttov_lib_preload=None, error_log_dir='.'):
+            rttov_lib_preload=None, cache_dir=None, force_rebuild_cache=False,
+            error_log_dir='.'):
     """
     Run the TES algorithm on a list of ECOSTRESS L1B RAD files, using a
     single (alpha1, alpha2, alpha3) coefficient set.
@@ -157,8 +215,12 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
     rttov_lib_preload : str, optional
         Optional explicit path to a compiled RTTOV f2py wrapper shared
         library (.so) to preload via ctypes before importing pyrttov.
-        Only needed as a workaround on environments where pyrttov's own
-        loading mechanism fails; left unset (None) by default.
+    cache_dir : str, optional
+        Directory used to persist the GEO file-name lookup map to disk
+        (JSON), avoiding a costly re-scan of slow/networked storage on
+        every run. If None, caching is disabled.
+    force_rebuild_cache : bool
+        If True, ignore any existing cache and rescan the GEO directory.
     error_log_dir : str
         Directory where the execution error JSON log is written, if any.
     """
@@ -169,8 +231,8 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
 
     map_error = dict()
 
-    print(f'Building local GEO file index for {directory_geo}')
-    map_geo = build_local_geo_map(directory_geo)
+    map_geo = build_local_geo_map(directory_geo, cache_dir=cache_dir,
+                                   force_rebuild=force_rebuild_cache)
 
     for filename_rad in rad_files:
         print('Run Temperature Emissivity Separation algorithm on ECOSTRESS data ' + filename_rad)
@@ -351,6 +413,18 @@ def build_arg_parser():
     tes_group.add_argument('--alpha3', type=float, default=DEFAULT_ALPHA3,
                             help='alpha3 coefficient used in LST_Estimate().')
 
+    cache_group = parser.add_argument_group('GEO file-name cache (avoids rescanning slow/networked storage)')
+    cache_group.add_argument(
+        '--cache-dir', default=None,
+        help=('Directory used to persist the GEO file-name lookup map to disk (JSON). '
+              'If not given, defaults to <output-dir>/.tes_filename_cache. '
+              'Pass an empty string ("") to disable caching entirely and always rescan.')
+    )
+    cache_group.add_argument(
+        '--force-rebuild-cache', action='store_true',
+        help='Ignore any existing GEO file-name cache and rescan the directory.'
+    )
+
     parser.add_argument('--error-log-dir', default='.',
                          help='Directory to write the execution error JSON log to, if any.')
 
@@ -372,6 +446,13 @@ def main(argv=None):
 
     os.makedirs(args.output_dir, exist_ok=True)
 
+    if args.cache_dir is None:
+        cache_dir = os.path.join(args.output_dir, '.tes_filename_cache')
+    elif args.cache_dir == '':
+        cache_dir = None  # caching explicitly disabled
+    else:
+        cache_dir = args.cache_dir
+
     run_TES(
         rad_files=rad_files,
         directory_geo=args.geo_dir,
@@ -384,6 +465,8 @@ def main(argv=None):
         alpha2=args.alpha2,
         alpha3=args.alpha3,
         rttov_lib_preload=args.rttov_lib_preload,
+        cache_dir=cache_dir,
+        force_rebuild_cache=args.force_rebuild_cache,
         error_log_dir=args.error_log_dir,
     )
 
