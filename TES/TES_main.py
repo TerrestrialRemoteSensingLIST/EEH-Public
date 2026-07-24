@@ -6,6 +6,11 @@ Script to run the Temperature Emissivity Separation (TES) algorithm for LST esti
 Created on April 15 2021
 @author: Tian Hu at LIST
 
+Modified to run fully locally (no S3 access required):
+ - Removed cache_S3_with_indexes / S3_cache dependency.
+ - Added build_local_geo_map(), which scans a local directory of GEO (.h5)
+   files and builds the same {canonical_name: actual_filename} mapping that
+   Read_L1B_Data() expects, so no code changes were needed downstream.
 """
 import sys
 import os
@@ -18,16 +23,77 @@ from AtmCorrection import runRTTOV
 from TES_vec import LST_Estimate
 from scipy.interpolate import griddata
 
-#import cache function
-sys.path.insert(0,'../utils')
-from S3_cache import cache_S3_with_indexes
-
 #rttov manual insertion from path
 #import ctypes
 #lib = ctypes.CDLL('/volume/rttov/lib/rttov_wrapper_f2py.so')
 
 import traceback
-import json 
+import json
+
+
+def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
+                         exclude_substrings=('.xml', '.dmrpp')):
+    """
+    Local, pure-Python replacement for cache_S3_with_indexes().
+
+    Original S3 version (S3_cache.py) worked by:
+      1. `ls -U <mount_folder><folder>` (excluding .xml / .dmrpp files),
+      2. keying each resulting filename by a fixed character slice
+         thing[key_index1:key_index2],
+      3. mapping that key -> the full filename.
+
+    Read_L1B_Data() builds its lookup key as:
+        'ECOv002_L1B_GEO_' (16 chars) + orbit_str (9) + '_' (1)
+        + date_str (8) + 'T' (1) + hour_str+min_str+sec_str (6)
+      = 41 characters total, i.e. filename[0:41].
+
+    This function reproduces that exact keying, but scans a local
+    directory directly instead of shelling out to `ls` against an S3
+    mount, and takes directory_geo as an argument instead of a
+    hardcoded mount_folder/folder pair.
+
+    Parameters
+    ----------
+    directory_geo : str
+        Local folder containing the GEO .h5 files.
+    key_index1, key_index2 : int
+        Character slice [key_index1:key_index2] of the filename used as
+        the lookup key. Defaults (0, 41) match the existing GEO naming
+        convention and Read_L1B_Data()'s key construction. Only change
+        these if your local filenames differ from that convention.
+    exclude_substrings : tuple of str
+        Files containing any of these substrings are skipped (mirrors
+        the original `grep -v xml | grep -v dmrpp` filtering).
+
+    Returns
+    -------
+    dict : {filename[key_index1:key_index2]: actual_filename}
+    """
+    if not os.path.isdir(directory_geo):
+        raise FileNotFoundError(f"GEO directory not found: {directory_geo}")
+
+    geo_map = {}
+
+    for fname in sorted(os.listdir(directory_geo)):
+        if any(sub in fname for sub in exclude_substrings):
+            continue
+        if not os.path.isfile(os.path.join(directory_geo, fname)):
+            continue
+
+        key = fname[key_index1:key_index2]
+
+        if key in geo_map:
+            print(f'Warning: duplicate GEO key "{key}" -> keeping "{geo_map[key]}", '
+                  f'ignoring "{fname}"')
+            continue
+
+        geo_map[key] = fname
+
+    if not geo_map:
+        print(f'Warning: no GEO files found in {directory_geo}')
+
+    return geo_map
+
 
 def parse_input_config(config_file):
     data = np.loadtxt(config_file,dtype=bytes).astype(str)
@@ -174,18 +240,20 @@ def run_TES_from_config_file(config_file):
     (config_data,row,_,ready) = parse_input_config(config_file)
 
     map_error = dict()
+    geo_map_cache = {}  # directory_geo -> map_geo, so we don't rescan the same folder repeatedly
 
     if ready == 1:
-        print('Run GEO caching')
-        map_geo = cache_S3_with_indexes('L1B_GEO_V002',0,41)
-        #map_geo = cache_S3_with_indexes('L1B_GEO_V002',0,43)
-
         for i in range(row):           
             filename_rad = config_data[i,0]
             directory_geo = config_data[i,1]
             directory_era5 = config_data[i,2]
             directory_output = config_data[i,3]
-    
+
+            if directory_geo not in geo_map_cache:
+                print(f'Building local GEO file index for {directory_geo}')
+                geo_map_cache[directory_geo] = build_local_geo_map(directory_geo)
+            map_geo = geo_map_cache[directory_geo]
+
             print('Run Temperature Emissivity Separation algorithm on ECOSTRESS data ' + filename_rad)
 
             try:
@@ -349,4 +417,4 @@ if __name__ == '__main__':
         run_TES_from_config_file(config_file)
     else:
         message = 'ERROR!! Configuration Data Required!'
-        raise Exception(message) 
+        raise Exception(message)
