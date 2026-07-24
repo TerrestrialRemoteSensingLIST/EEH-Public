@@ -4,13 +4,16 @@
 Script to run the Temperature Emissivity Separation (TES) algorithm for LST estimation
 
 Created on April 15 2021
-@author: Tian Hu at LIST
+@author: Tian Hu, Yoanne Didry at LIST
 
 © 2026 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu (tian.hu@list.lu)
+Authors : Tian Hu (tian.hu@list.lu), Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
+
+# Main function
+
 import argparse
 import glob
 import hashlib
