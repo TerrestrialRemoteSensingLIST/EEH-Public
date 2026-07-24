@@ -19,13 +19,8 @@ Modified to run fully locally (no WASDI platform dependency):
 - Added build_local_pattern_map(), a local, regex-based replacement that
   scans a local directory and builds the same {key: actual_filename}
   mapping that Read_ECOSTRESS() / Read_Ancillary() expect, so downstream
-  code did not need to change.
-
-NOTE: build_local_pattern_map() reproduces the *inferred* behaviour of
-cache_S3_with_pattern() based on its call sites (regex capture group ->
-dict key -> matching filename). If the original S3_cache.py implementation
-differs (e.g. recursive search, different disambiguation rules), please
-share it so this can be adjusted for exact parity.
+  code did not need to change. Uses re.search() (not re.match()), matching
+  the original cache_S3_with_pattern() behaviour.
 """
 import argparse
 import glob
@@ -54,9 +49,13 @@ def build_local_pattern_map(directory, pattern, label=None):
     """
     Local, pure-Python replacement for cache_S3_with_pattern().
 
-    Scans `directory` and, for every file whose name matches `pattern`,
-    uses the *first capturing group* of the regex as the lookup key,
-    mapping it to the actual filename found on disk.
+    Original S3 version read a pre-generated list of filenames from
+    '<mount_folder>utils/<name>_S3_cached.txt' and applied re.search(pattern,
+    filename) to each line, using capturing group 1 as the lookup key.
+
+    This function reproduces the exact same key -> filename mapping logic
+    (re.search, group(1)), but scans a local directory directly instead of
+    reading a pre-generated S3 file list.
 
     Parameters
     ----------
@@ -64,11 +63,9 @@ def build_local_pattern_map(directory, pattern, label=None):
         Local folder to scan.
     pattern : str
         Regular expression with exactly one capturing group, applied with
-        re.match() (i.e. anchored at the start of the filename).
+        re.search() (i.e. matched anywhere in the filename, not anchored).
     label : str, optional
-        Purely cosmetic, used only for log messages (kept for parity with
-        the original cache_S3_with_pattern(label, directory, pattern)
-        call signature/spirit).
+        Purely cosmetic, used only for log messages.
 
     Returns
     -------
@@ -82,7 +79,7 @@ def build_local_pattern_map(directory, pattern, label=None):
     for fname in sorted(os.listdir(directory)):
         if not os.path.isfile(os.path.join(directory, fname)):
             continue
-        m = regex.match(fname)
+        m = regex.search(fname)
         if not m:
             continue
         key = m.group(1)
@@ -270,8 +267,8 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
         directional and hemispherical albedo (mirrors the original script,
         where map_albdir2 == map_albhem2).
     directory_lulc : str
-        Directory (or path, depending on Read_Ancillary) containing the
-        land-use/land-cover raster.
+        Directory containing the PROBAV LC100 land-cover raster (fixed
+        filename, no lookup pattern needed -- see Read_LULC()).
     directory_era5 : str
         Directory containing the ERA5 files.
     directory_output : str
@@ -290,8 +287,10 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
     map_geo = build_local_pattern_map(directory_geo, geo_pattern, label='L1B_GEO')
     map_cloud = build_local_pattern_map(directory_cld, cloud_pattern, label='CLOUD')
     map_fvc = build_local_pattern_map(directory_fvc, fcover_pattern, label='FCOVER')
-    # NOTE: kept empty, mirroring the original script (CGLS Albedo_Directional
-    # / Albedo_Hemispherical .nc caches were never populated there either).
+    # NOTE: kept empty, mirroring the original script -- ReadAncillaryData's
+    # Read_ALB_DIR/Read_ALB_HEM only use map_albdir1/map_albhem1 in a
+    # permanently disabled (`if False:`) legacy branch (pre-2020.7 CGLS
+    # Albedo_Directional/Albedo_Hemispherical .nc products).
     map_albdir1 = {}
     map_albhem1 = {}
     map_albdir2 = build_local_pattern_map(directory_alb_mota, mota_pattern, label='MOTA')
@@ -441,7 +440,7 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
 # ---------------------------------------------------------------------------
 def build_arg_parser():
     parser = argparse.ArgumentParser(
-        prog='run_STIC.py',
+        prog='STIC_main.py',
         description='Run the STIC model for ET estimation on ECOSTRESS L2_LSTE data.',
         formatter_class=argparse.ArgumentDefaultsHelpFormatter,
     )
@@ -470,7 +469,7 @@ def build_arg_parser():
                          help='Directory containing the MCD43C3 (.hdf) albedo files '
                               '(used for both directional and hemispherical albedo).')
     parser.add_argument('--lulc-dir', required=True,
-                         help='Directory containing the land-use/land-cover raster.')
+                         help='Directory containing the PROBAV LC100 land-cover raster.')
     parser.add_argument('--era5-dir', required=True,
                          help='Directory containing the ERA5 reanalysis files.')
     parser.add_argument('--output-dir', required=True,
