@@ -1,3 +1,17 @@
+#!/usr/bin/python
+# -*- coding: utf-8 -*-
+"""
+Script to run the hybrid model for GPP and WUE estimation
+
+Created on May 1 2025
+@author: Ziyu Lin at LIST
+
+© 2025 – Luxembourg Institute of Science and Technology
+Authors : Ziyu Lin, Kaniska Mallick, Tian Hu (tian.hu@list.lu)
+Code licensed under MIT
+SPDX-License-Identifier: MIT
+"""
+
 import sys
 sys.path.insert(0,'./utils')
 
@@ -14,14 +28,12 @@ import xarray as xr
 import rioxarray
 from rioxarray.merge import merge_arrays
 from rasterio.enums import Resampling
-import pandas as pd
 import re
 import time
 import seaborn as sns
 import matplotlib.pyplot as plt
 from shapely.geometry import Point, Polygon, box
 import geopandas as gpd
-import re
 import sys
 from pyhdf.SD import SD, SDC
 from scipy.interpolate import griddata

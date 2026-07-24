@@ -3,11 +3,11 @@
 """
 Script to run the STIC model for ET estimation
 
-Created on March 18 2021
+Created on September 1 2024
 @author: Tian Hu at LIST
 
-© 2022 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu, Kaniska Mallick
+© 2024 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
