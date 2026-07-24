@@ -11,10 +11,7 @@ More information about the model can be found in the papers below:
 4) Hu, Tian, Mallick, Kaniska, Hitzelberger, P., Didry, Y., Boulet, G., Szantoi, Z., et al. (2023). Evaluating European ECOSTRESS Hub Evapotranspiration Products Across a Range of Soil-Atmospheric Aridity and Biomes Over Europe. Water Resources Research, 59(8), e2022WR034132. https://doi.org/https://doi.org/10.1029/2022WR034132
 
 # Inputs
-This step used to require a fixed 9-column input.txt config file, processed
-one line per image (see legacy format below). It has been replaced by
-command-line arguments (see Usage below):
-
+The command-line arguments are listed as below:
 1) `--input-files` / `--input-dir` : ECOSTRESS L2_LSTE file(s) to process (TES output)
 2) `--geo-dir`          : directory for ECOSTRESS L1B_GEO
 3) `--cloud-dir`        : directory for ECOSTRESS cloud mask
@@ -27,7 +24,7 @@ command-line arguments (see Usage below):
 # Usage
 To run the code, type the following in command line:
 
-python myProcessor.py \
+python STIC_main.py \
     --input-files /data/output_tes/EEH2TES_L2_LSTE_..._0000_00.h5 \
     --geo-dir /data/geo \
     --cloud-dir /data/cloud \
