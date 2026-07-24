@@ -6,12 +6,12 @@ Script to run the Temperature Emissivity Separation (TES) algorithm for LST esti
 Created on April 15 2021
 @author: Tian Hu at LIST
 
-Modified to run fully locally (no S3 access required):
- - Removed cache_S3_with_indexes / S3_cache dependency.
- - Added build_local_geo_map(), which scans a local directory of GEO (.h5)
-   files and builds the same {canonical_name: actual_filename} mapping that
-   Read_L1B_Data() expects, so no code changes were needed downstream.
+© 2024 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
+Code licensed under MIT
+SPDX-License-Identifier: MIT
 """
+
 import sys
 import os
 import numpy as np
@@ -235,7 +235,6 @@ def generate_hdf5_file(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa
     
     f_lst.close()   
     
-
 def run_TES_from_config_file(config_file):
     (config_data,row,_,ready) = parse_input_config(config_file)
 
@@ -406,9 +405,6 @@ def run_TES_from_config_file(config_file):
         pid = str(os.getpid())
         with open('execution_'+pid+'_errors.txt', 'w') as file:
             file.write(json.dumps(map_error))
-
-
-
 
 if __name__ == '__main__':
     args = sys.argv
