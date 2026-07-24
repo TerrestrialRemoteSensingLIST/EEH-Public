@@ -4,28 +4,16 @@
 Script to run the STIC model for ET estimation
 
 Created on September 1 2024
-@author: Tian Hu at LIST
+@author: Tian Hu, Kaniska Mallick, Yoanne Didry at LIST
 
-© 2024 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
+© 2026 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
-
-Modified to run fully locally (no WASDI platform dependency):
-- Removed all wasdi.* calls -> replaced by plain Python (print) and an
-  argparse-based CLI, mirroring run_TES.py.
-- Removed cache_S3_with_pattern() / S3_cache.py dependency.
-- Added build_local_pattern_map(), a local, regex-based replacement that
-  scans a local directory and builds the same {key: actual_filename}
-  mapping that Read_ECOSTRESS() / Read_Ancillary() expect. Uses re.search()
-  (not re.match()), matching the original cache_S3_with_pattern() behaviour.
-- Performance: directory scans use os.scandir() and check the regex before
-  calling is_file() (avoids a stat() call for every non-matching entry),
-  the 4 independent directory scans (GEO/CLOUD/FCOVER/MOTA) are run in
-  parallel threads, and results are cached to disk as JSON so that slow /
-  networked storage only needs to be scanned once (use
-  --force-rebuild-cache to force a re-scan).
 """
+
+# Main function
+
 import argparse
 import glob
 import hashlib
@@ -48,7 +36,7 @@ from LUT import f_ETDaily
 
 
 # ---------------------------------------------------------------------------
-# Local file-name caching (replaces S3_cache.cache_S3_with_pattern)
+# Local file-name caching
 # ---------------------------------------------------------------------------
 def _cache_file_path(cache_dir, label, directory, pattern):
     """Build a stable, unique cache filename for a given (directory, pattern) pair."""
@@ -59,23 +47,6 @@ def _cache_file_path(cache_dir, label, directory, pattern):
 def build_local_pattern_map(directory, pattern, label=None,
                              cache_dir=None, force_rebuild=False):
     """
-    Local, pure-Python replacement for cache_S3_with_pattern().
-
-    Original S3 version read a pre-generated list of filenames from
-    '<mount_folder>utils/<name>_S3_cached.txt' and applied re.search(pattern,
-    filename) to each line, using capturing group 1 as the lookup key.
-
-    This function reproduces the exact same key -> filename mapping logic
-    (re.search, group(1)), scanning a local directory directly instead of
-    reading a pre-generated S3 file list. Results are optionally cached to
-    disk (JSON) to avoid rescanning slow/networked storage on every run.
-
-    When multiple files share the same key (e.g. successive CGLS FCOVER
-    reprocessing rounds RT0/RT1/RT2/RT6 for the same date, or successive
-    MODIS MCD43C3 production timestamps for the same day), the file whose
-    name is lexicographically greatest is kept deterministically (higher
-    RT round / later production timestamp sorts last as a string).
-
     Parameters
     ----------
     directory : str
@@ -383,12 +354,20 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
     """
     map_error = dict()
 
+<<<<<<< HEAD
     print('Building local file-name caches (parallel scan)...')
     map_geo, map_cloud, map_fvc, map_albdir2 = build_all_caches(
         directory_geo, directory_cld, directory_fvc, directory_alb_mota,
         geo_pattern, cloud_pattern, fcover_pattern, mota_pattern,
         cache_dir=cache_dir, force_rebuild=force_rebuild_cache,
     )
+=======
+    print('Building local file-name caches...')
+    map_geo = build_local_pattern_map(directory_geo, geo_pattern, label='L1B_GEO')
+    map_cloud = build_local_pattern_map(directory_cld, cloud_pattern, label='CLOUD')
+    map_fvc = build_local_pattern_map(directory_fvc, fcover_pattern, label='FCOVER')
+    
+>>>>>>> 11b7070c69b4de1a887f18ed0cd10fcfbed1af51
     # NOTE: kept empty, mirroring the original script -- ReadAncillaryData's
     # Read_ALB_DIR/Read_ALB_HEM only use map_albdir1/map_albhem1 in a
     # permanently disabled (`if False:`) legacy branch (pre-2020.7 CGLS

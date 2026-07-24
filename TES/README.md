@@ -11,11 +11,16 @@ A. Gillespie, S. Rokugawa, T. Matsunaga, J. S. Cothern, S. Hook and A. B. Kahle,
 
 # Inputs
 The command-line arguments are listed as below:
+The command-line arguments are listed as below:
 1) `--input-files` / `--input-dir` : ECOSTRESS L1B_RAD (V002) file(s) to process
-2) `--geo-dir`     : directory for ECOSTRESS L1B_GEO (V002)
-3) `--era5-dir`    : directory for ERA5 data
-4) `--output-dir`  : directory for storing output HDF5 data
-5) `--rttov-installdir` (+ optional `--rttov-wrapper-dir`, `--rttov-coef-file`) : local RTTOV installation
+2) `--pattern`     : glob pattern to select RAD files (only used with `--input-dir`, default: `*L1B_RAD*.h5`)
+3) `--geo-dir`     : directory for ECOSTRESS L1B_GEO (V002)
+4) `--era5-dir`    : directory for ERA5 data
+5) `--output-dir`  : directory for storing output HDF5 data
+6) `--rttov-installdir` (+ optional `--rttov-wrapper-dir`, `--rttov-coef-file`) : local RTTOV installation
+7) `--cache-dir`   : directory to persist the GEO file-name lookup map (JSON cache), avoids rescanning slow/networked storage (default: `<output-dir>/.tes_filename_cache`; pass `""` to disable caching)
+8) `--force-rebuild-cache` : ignore any existing GEO file-name cache and rescan the directory
+9) `--error-log-dir` : directory for the execution error JSON log, if any (default: current directory)
 
 # Usage
 To run the code, type the following in command line:
@@ -28,12 +33,20 @@ python TES_main.py \
     --rttov-installdir /root/rttov \
     --rttov-wrapper-dir /root/rttov/wrapper
 
+To process a whole batch of files instead of listing them individually,
+replace `--input-files` with:
+
+    --input-dir /data/rad \
+    --pattern "ECOv002_L1B_RAD_*.h5"
+
 # Optional
 --alpha1 / --alpha2 / --alpha3   : override the default TES coefficients
                                     (0.9895, 0.7994, 0.8572)
 --rttov-lib-preload               : advanced workaround only, preloads a
                                     compiled RTTOV f2py wrapper .so via
                                     ctypes before importing pyrttov
+--force-rebuild-cache             : ignore the GEO file-name cache and
+                                    force a directory rescan
 
 
 # Citation

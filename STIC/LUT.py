@@ -4,15 +4,16 @@
 Script to run the STIC model for ET estimation
 
 Created on September 1 2024
-@author: Tian Hu at LIST
+@author: Tian Hu, Kaniska Mallick, Yoanne Didry at LIST
 
-© 2024 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
+© 2026 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
 # The LUT method for estimating daily ET
+
 import numpy as np
 
 #Calculate daily ET using the calibrated LUT method

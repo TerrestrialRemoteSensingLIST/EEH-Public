@@ -12,14 +12,21 @@ More information about the model can be found in the papers below:
 
 # Inputs
 The command-line arguments are listed as below:
+The command-line arguments are listed as below:
 1) `--input-files` / `--input-dir` : ECOSTRESS L2_LSTE file(s) to process (TES output)
-2) `--geo-dir`          : directory for ECOSTRESS L1B_GEO
-3) `--cloud-dir`        : directory for ECOSTRESS cloud mask
-4) `--fcover-dir`       : directory for FVC data
-5) `--albedo-mota-dir`  : directory for blacksky and whitesky albedo
-6) `--lulc-dir`         : directory for LULC data
-7) `--era5-dir`         : directory for ERA5 data
-8) `--output-dir`       : directory for storing output HDF5 data
+2) `--pattern`          : glob pattern to select LSTE files (only used with `--input-dir`, default: `*L2_LSTE*.h5`)
+3) `--geo-dir`          : directory for ECOSTRESS L1B_GEO
+4) `--cloud-dir`        : directory for ECOSTRESS cloud mask
+5) `--fcover-dir`       : directory for FVC data
+6) `--albedo-mota-dir`  : directory for blacksky and whitesky albedo
+7) `--lulc-dir`         : directory for LULC data
+8) `--era5-dir`         : directory for ERA5 data
+9) `--output-dir`       : directory for storing output HDF5 data
+10) `--geo-pattern`     : regex pattern for ECOSTRESS L1B_GEO filenames (default: `(ECOv002_L1B_GEO.*)_\d{4}_\d{2}\.h5`)
+11) `--cloud-pattern`   : regex pattern for ECOSTRESS L2_CLOUD filenames (default: `(ECOv002_L2_CLOUD.*)_\d{4}_\d{2}\.h5`)
+12) `--fcover-pattern`  : regex pattern for CGLS FCOVER filenames (default: `c_gls_FCOVER300(?:-RT\d+)?_(\d{8})0000_GLOBE_.*\.nc`)
+13) `--mota-pattern`    : regex pattern for MCD43C3 albedo filenames (default: `MCD43C3\.A(\d{7}).*\.hdf`)
+14) `--error-log-dir`   : directory for the execution error JSON log, if any (default: current directory)
 
 # Usage
 To run the code, type the following in command line:
@@ -33,6 +40,19 @@ python STIC_main.py \
     --lulc-dir /data/lulc \
     --era5-dir /data/era5 \
     --output-dir /data/output_stic
+
+To process a whole batch of files instead of a single file, replace `--input-files` with:
+
+    --input-dir /data/output_tes \
+    --pattern "EEH2TES_L2_LSTE_*.h5"
+
+If your local GEO/CLOUD/FVC/albedo filenames do not follow the standard
+ECOSTRESS/CGLS/MODIS naming conventions, override the matching patterns, e.g.:
+
+    --geo-pattern '(ECOv002_L1B_GEO.*)_\d{4}_\d{2}\.h5' \
+    --cloud-pattern '(ECOv002_L2_CLOUD.*)_\d{4}_\d{2}\.h5' \
+    --fcover-pattern 'c_gls_FCOVER300(?:-RT\d+)?_(\d{8})0000_GLOBE_.*\.nc' \
+    --mota-pattern 'MCD43C3\.A(\d{7}).*\.hdf'
     
 # Citation
 The following paper should be cited when using this code:

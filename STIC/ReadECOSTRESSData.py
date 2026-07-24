@@ -3,16 +3,17 @@
 """
 Script to run the STIC model for ET estimation
 
-Created on March 18 2021
-@author: Tian Hu at LIST
+Created on September 1 2024
+@author: Tian Hu, Kaniska Mallick, Yoanne Didry at LIST
 
-© 2022 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
+© 2026 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
-# Functions for read the ECOSTRESS L2_LSTE, L1B_GEO and L2_CLOUD data 
+# Functions for reading the ECOSTRESS L2_LSTE, L1B_GEO and L2_CLOUD data 
+
 import h5py
 import numpy as np
 import os

@@ -3,16 +3,17 @@
 """
 Script to run the STIC model for ET estimation
 
-Created on March 18 2021
-@author: Tian Hu at LIST
+Created on September 1 2024
+@author: Tian Hu, Kaniska Mallick, Yoanne Didry at LIST
 
-© 2022 – Luxembourg Institute of Science and Technology
-Authors : Tian Hu (tian.hu@list.lu), Kaniska Mallick
+© 2026 – Luxembourg Institute of Science and Technology
+Authors : Tian Hu (tian.hu@list.lu), Yoanne Didry (yoanne.didry@list.lu)
 Code licensed under MIT
 SPDX-License-Identifier: MIT
 """
 
 #Component function of STIC
+
 import numpy as np
 
 def f_SoilMoisture_INITIALIZE(gamma,slope,TS,TA,TD,dTS,RG,RN,Lnet,fc,DA,eastar,ea,esstar):
