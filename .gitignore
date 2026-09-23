@@ -48,6 +48,15 @@ Thumbs.db
 pattern_cache_*.json
 execution_*_errors.txt
 
-# --- Data / outputs (uncomment if you don't want to version large binary outputs) ---
+# --- RTTOV tarball (user-supplied, not versioned) ---
+rttov*.tar.gz
+
+# --- Downloaded / generated data ---
+/data/
+
+# --- Data / outputs ---
+/output/
 # *.h5
-# /data/
+
+# --- Claude Code local session state ---
+.claude/
