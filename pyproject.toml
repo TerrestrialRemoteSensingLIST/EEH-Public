@@ -1,0 +1,34 @@
+[project]
+name = "eeh-pipeline"
+version = "1.0.0"
+description = "ESA ECOSTRESS European Hub (EEH2) processing pipeline: TES → STIC → GPP"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+
+dependencies = [
+    # --- shared ---
+    "numpy",
+    "h5py",
+    "scipy",
+    "cfgrib",
+    # --- TES ---
+    "opencv-python",
+    # --- STIC ---
+    "netCDF4",
+    "pyhdf",
+    # --- GPP ---
+    "pandas",
+    "xarray",
+    "rioxarray",
+    "rasterio",
+    "matplotlib",
+    "shapely",
+    "geopandas",
+    # --- pipeline orchestration ---
+    "python-dotenv",
+]
+
+[project.optional-dependencies]
+stic = ["GDAL"]
+download = ["cdsapi"]

@@ -1,0 +1,12 @@
+.venv/
+.env
+__pycache__/
+*.pyc
+.git/
+data/
+output/
+*.egg-info/
+.pytest_cache/
+.gpp_filename_cache/
+pattern_cache_*.json
+execution_*_errors.txt

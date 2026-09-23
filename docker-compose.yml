@@ -1,0 +1,80 @@
+services:
+  eeh-pipeline:
+    build: .
+    # Meme image que 'download': les deux services executent le meme code
+    # (seul l'entrypoint differe). Sans ce tag partage, chacun a son image et
+    # 'docker compose build eeh-pipeline' laisse 'download' sur du code perime.
+    image: eeh2:latest
+    volumes:
+      - ${DATA_ROOT:-./data}:/data
+      - ${OUTPUT_ROOT:-./output}:/output
+    environment:
+      - RTTOV_INSTALLDIR=/opt/rttov123
+      - INPUT_RAD_DIR=/data/rad
+      - GEO_DIR=/data/geo
+      - CLOUD_DIR=/data/cloud
+      - ERA5_DIR=/data/era5
+      - FCOVER_DIR=/data/fcover
+      - ALBEDO_MOTA_DIR=/data/mota
+      - LULC_DIR=/data/lulc
+      - PARH_DIR=/data/parh
+      - LAI_DIR=/data/lai
+      - FVC_DIR=/data/fcover
+      - OCO2_DIR=/data/oco2
+      - GLC30_DIR=/data/glc30
+      - LUT_FILE=/app/GPP/LookUpTable_LUE_HH_gsFULL-globe.csv
+      - OUTPUT_TES=/output/tes
+      - OUTPUT_STIC=/output/stic
+      - OUTPUT_GPP=/output/gpp
+      - OUTPUT_COG=/output/cog
+      - RUN_TES=true
+      - RUN_STIC=true
+      - RUN_GPP=true
+      # Processing domain "N,W,S,E" (default: Europe/Africa 75,-20,-35,60).
+      # Bounds the ERA5 request and the granule filter; see README.
+      - EEH2_DOMAIN=${EEH2_DOMAIN:-}
+      # Download credentials (for auto-download with --orbit)
+      - EARTHDATA_USERNAME=${EARTHDATA_USERNAME}
+      - EARTHDATA_PASSWORD=${EARTHDATA_PASSWORD}
+      - CDS_API_URL=${CDS_API_URL:-https://cds.climate.copernicus.eu/api}
+      - CDS_API_KEY=${CDS_API_KEY}
+      - CDSE_USERNAME=${CDSE_USERNAME}
+      - CDSE_PASSWORD=${CDSE_PASSWORD}
+      - EUMETSAT_CONSUMER_KEY=${EUMETSAT_CONSUMER_KEY}
+      - EUMETSAT_CONSUMER_SECRET=${EUMETSAT_CONSUMER_SECRET}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-ECOSTRESS}
+
+  download:
+    build: .
+    image: eeh2:latest
+    entrypoint: ["python", "tools/download_sample.py", "--output-dir", "/data"]
+    volumes:
+      - ${DATA_ROOT:-./data}:/data
+    environment:
+      - EEH2_DOMAIN=${EEH2_DOMAIN:-}
+      - EARTHDATA_USERNAME=${EARTHDATA_USERNAME}
+      - EARTHDATA_PASSWORD=${EARTHDATA_PASSWORD}
+      - CDS_API_URL=${CDS_API_URL:-https://cds.climate.copernicus.eu/api}
+      - CDS_API_KEY=${CDS_API_KEY}
+      - CDSE_USERNAME=${CDSE_USERNAME}
+      - CDSE_PASSWORD=${CDSE_PASSWORD}
+      - EUMETSAT_CONSUMER_KEY=${EUMETSAT_CONSUMER_KEY}
+      - EUMETSAT_CONSUMER_SECRET=${EUMETSAT_CONSUMER_SECRET}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+      - S3_ACCESS_KEY=${S3_ACCESS_KEY}
+      - S3_SECRET_KEY=${S3_SECRET_KEY}
+      - S3_BUCKET=${S3_BUCKET:-ECOSTRESS}
+      - S3_PREFIX_RAD=${S3_PREFIX_RAD:-L1B_RAD_V002}
+      - S3_PREFIX_GEO=${S3_PREFIX_GEO:-L1B_GEO_V002}
+      - S3_PREFIX_CLOUD=${S3_PREFIX_CLOUD:-L2_CLOUD_V002}
+      - S3_PREFIX_ERA5=${S3_PREFIX_ERA5:-ERA5}
+      - S3_PREFIX_MOTA=${S3_PREFIX_MOTA:-MOTA}
+      - S3_PREFIX_FCOVER=${S3_PREFIX_FCOVER:-FCOVER}
+      - S3_PREFIX_LAI=${S3_PREFIX_LAI:-LAI}
+      - S3_PREFIX_LULC=${S3_PREFIX_LULC:-LULC}
+      - S3_PREFIX_OCO2=${S3_PREFIX_OCO2:-OCO2}
+      - S3_PREFIX_GLC30=${S3_PREFIX_GLC30:-GLC_FCS30D}
+      - S3_PREFIX_PARH=${S3_PREFIX_PARH:-PARH}
