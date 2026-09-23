@@ -186,7 +186,14 @@ def read_and_wrap_GLC30(list_tif, lat_eco, lon_eco, eco_bound, year):
     interpreter shutdown.
     """
     lat_max, lat_min, lon_max, lon_min = eco_bound
-    band_ind = year - 2016 if year <= 2022 else 6
+    # Detect tile version from filename to compute correct band index
+    first_path = str(list_tif[0]) if list_tif else ""
+    if '20002022' in first_path:
+        band_ind = year - 2000 if year <= 2022 else 22
+    elif '19852022' in first_path:
+        band_ind = year - 1985 if year <= 2022 else 37
+    else:
+        band_ind = year - 2016 if year <= 2022 else 6
     glc30_grid = xr.DataArray(
         data=np.ones(lat_eco.shape, dtype=np.int16) * -9999,
         coords={

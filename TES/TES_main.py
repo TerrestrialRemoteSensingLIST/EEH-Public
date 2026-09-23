@@ -33,6 +33,44 @@ from ReadERA5Data import Read_ERA5
 from TES_vec import LST_Estimate
 
 
+# Processing domain (N, W, S, E). ERA5 is only retrieved over this box, so a
+# granule outside it has no atmospheric profile: the ERA5 crop collapses to a
+# single grid cell, the bilinear weights sum to (x1-x0)*(y1-y0) = 0 and RTTOV is
+# handed a 0 K 2m temperature ("invalid 2m air temperature"). An ISS orbit circles
+# the globe, so most of its granules fall outside. tools/download_sample.py
+# normally filters them out before download; this guard catches the ones already
+# on disk (synced from S3, copied by hand, or fetched with --whole-orbit).
+# Keep the default in sync with DOMAIN_DEFAULT in tools/download_sample.py.
+DOMAIN_DEFAULT = (75.0, -20.0, -35.0, 60.0)
+# ERA5 is on a 0.25 deg grid and bilinearly interpolated, so a granule needs at
+# least one full cell inside the domain in each direction to be usable.
+DOMAIN_MIN_OVERLAP_DEG = 0.25
+
+
+def processing_domain():
+    raw = os.environ.get('EEH2_DOMAIN', '')
+    if raw:
+        try:
+            n, w, s, e = (float(v) for v in raw.split(','))
+            return n, w, s, e
+        except ValueError:
+            print(f'[warn] cannot parse EEH2_DOMAIN={raw!r} -> using default domain')
+    return DOMAIN_DEFAULT
+
+
+def in_processing_domain(lat, lon):
+    """(inside, message) for a granule footprint against the processing domain."""
+    n, w, s, e = processing_domain()
+    lat_lo, lat_hi = float(np.nanmin(lat)), float(np.nanmax(lat))
+    lon_lo, lon_hi = float(np.nanmin(lon)), float(np.nanmax(lon))
+    ov_lat = min(lat_hi, n) - max(lat_lo, s)
+    ov_lon = min(lon_hi, e) - max(lon_lo, w)
+    inside = (ov_lat >= DOMAIN_MIN_OVERLAP_DEG and ov_lon >= DOMAIN_MIN_OVERLAP_DEG)
+    msg = (f'footprint lat {lat_lo:.1f}..{lat_hi:.1f}, lon {lon_lo:.1f}..{lon_hi:.1f} '
+           f'vs domain lat {s}..{n}, lon {w}..{e}')
+    return inside, msg
+
+
 # Default TES coefficients 
 DEFAULT_ALPHA1 = 0.9895
 DEFAULT_ALPHA2 = 0.7994
@@ -85,13 +123,18 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
         os.makedirs(cache_dir, exist_ok=True)
         cache_path = _cache_file_path(cache_dir, 'GEO', directory_geo, key_index1, key_index2)
         if not force_rebuild and os.path.isfile(cache_path):
-            try:
-                with open(cache_path, 'r') as f:
-                    geo_map = json.load(f)
-                print(f'[GEO] Using cached file-name map ({len(geo_map)} entries) from {cache_path}')
-                return geo_map
-            except Exception as e:
-                print(f'[GEO] Warning: failed to read cache {cache_path} ({e}) -> rescanning directory')
+            dir_mtime = os.path.getmtime(directory_geo) if os.path.isdir(directory_geo) else 0
+            cache_mtime = os.path.getmtime(cache_path)
+            if dir_mtime > cache_mtime:
+                print(f'[GEO] Directory changed since cache was built -> rescanning')
+            else:
+                try:
+                    with open(cache_path, 'r') as f:
+                        geo_map = json.load(f)
+                    print(f'[GEO] Using cached file-name map ({len(geo_map)} entries) from {cache_path}')
+                    return geo_map
+                except Exception as e:
+                    print(f'[GEO] Warning: failed to read cache {cache_path} ({e}) -> rescanning directory')
 
     if not os.path.isdir(directory_geo):
         raise FileNotFoundError(f"GEO directory not found: {directory_geo}")
@@ -126,7 +169,7 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
     else:
         print(f'[GEO] Found {len(geo_map)} matching files in {directory_geo}')
 
-    if cache_path:
+    if cache_path and geo_map:
         try:
             with open(cache_path, 'w') as f:
                 json.dump(geo_map, f)
@@ -226,6 +269,7 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
         ctypes.CDLL(rttov_lib_preload)
 
     map_error = dict()
+    map_skipped = dict()
 
     map_geo = build_local_geo_map(directory_geo, cache_dir=cache_dir,
                                    force_rebuild=force_rebuild_cache)
@@ -242,6 +286,12 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             map_error[filename_rad] = traceback.format_exc()
             continue
         print('Reading ECOSTRESS L1B data completed')
+
+        inside, domain_msg = in_processing_domain(lat_eco, lon_eco)
+        if not inside:
+            print(f'Granule outside the processing domain ({domain_msg}) -> skipping')
+            map_skipped[filename_rad] = domain_msg
+            continue
 
         # Resize the ECOSTRESS data with a 10-by-10 window
         nsubset = 10
@@ -339,6 +389,11 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             traceback.print_exc()
             print('Error -> stopping there')
             map_error[filename_rad] = traceback.format_exc()
+
+    processed = len(rad_files) - len(map_error) - len(map_skipped)
+    print(f'\nTES summary: {processed} processed, {len(map_skipped)} outside the '
+          f'processing domain, {len(map_error)} failed '
+          f'(out of {len(rad_files)} granule(s))')
 
     if map_error:
         pid = str(os.getpid())

@@ -73,8 +73,13 @@ def runRTTOV(p_era5, new_t, new_q, new_sp, new_q2m, new_t2m, new_skt, vza, sza, 
     #print("Valeurs de new_t2m : min =", np.min(new_t2m), "max =", np.max(new_t2m))
     #print("Valeurs de new_q2m : min =", np.min(new_q2m), "max =", np.max(new_q2m))
     
+    # RTTOV rejects non-physical 2m values outright (rttov_check_profiles), so
+    # floor them: 150 K is the coefficient file's lower temperature limit, and the
+    # humidity floor matches the profile floor applied in TES_main (0.1e-10 kg/kg).
+    # NB: this used to assign the humidity floor to new_t2m, which set t2m to 0.1 K
+    # wherever q2m <= 0 and made RTTOV report "invalid 2m air temperature".
     new_t2m[new_t2m <= 150] = 150
-    new_t2m[new_q2m <= 0] = 0.1
+    new_q2m[new_q2m <= 0] = 0.1e-10
     nlevels = new_t.shape[0]  # level number of atmospheric profiles
     nprofiles = new_t.shape[1]  # profile number for the entire ECOSTRESS subimage
     nchans = 3  # channel number for ECOSTRESS TIR bands

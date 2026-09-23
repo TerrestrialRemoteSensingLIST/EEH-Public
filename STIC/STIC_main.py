@@ -73,15 +73,20 @@ def build_local_pattern_map(directory, pattern, label=None,
         os.makedirs(cache_dir, exist_ok=True)
         cache_path = _cache_file_path(cache_dir, label, directory, pattern)
         if not force_rebuild and os.path.isfile(cache_path):
-            try:
-                with open(cache_path, 'r') as f:
-                    file_map = json.load(f)
-                print(f'[{label}] Using cached file-name map '
-                      f'({len(file_map)} entries) from {cache_path}')
-                return file_map
-            except Exception as e:
-                print(f'[{label}] Warning: failed to read cache {cache_path} '
-                      f'({e}) -> rescanning directory')
+            dir_mtime = os.path.getmtime(directory) if os.path.isdir(directory) else 0
+            cache_mtime = os.path.getmtime(cache_path)
+            if dir_mtime > cache_mtime:
+                print(f'[{label}] Directory changed since cache was built -> rescanning')
+            else:
+                try:
+                    with open(cache_path, 'r') as f:
+                        file_map = json.load(f)
+                    print(f'[{label}] Using cached file-name map '
+                          f'({len(file_map)} entries) from {cache_path}')
+                    return file_map
+                except Exception as e:
+                    print(f'[{label}] Warning: failed to read cache {cache_path} '
+                          f'({e}) -> rescanning directory')
 
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory not found for '{label}': {directory}")
@@ -122,7 +127,7 @@ def build_local_pattern_map(directory, pattern, label=None,
     else:
         print(f'[{label}] Found {len(file_map)} matching files in {directory}')
 
-    if cache_path:
+    if cache_path and file_map:
         try:
             with open(cache_path, 'w') as f:
                 json.dump(file_map, f)
@@ -354,20 +359,12 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
     """
     map_error = dict()
 
-<<<<<<< HEAD
     print('Building local file-name caches (parallel scan)...')
     map_geo, map_cloud, map_fvc, map_albdir2 = build_all_caches(
         directory_geo, directory_cld, directory_fvc, directory_alb_mota,
         geo_pattern, cloud_pattern, fcover_pattern, mota_pattern,
         cache_dir=cache_dir, force_rebuild=force_rebuild_cache,
     )
-=======
-    print('Building local file-name caches...')
-    map_geo = build_local_pattern_map(directory_geo, geo_pattern, label='L1B_GEO')
-    map_cloud = build_local_pattern_map(directory_cld, cloud_pattern, label='CLOUD')
-    map_fvc = build_local_pattern_map(directory_fvc, fcover_pattern, label='FCOVER')
-    
->>>>>>> 11b7070c69b4de1a887f18ed0cd10fcfbed1af51
     # NOTE: kept empty, mirroring the original script -- ReadAncillaryData's
     # Read_ALB_DIR/Read_ALB_HEM only use map_albdir1/map_albhem1 in a
     # permanently disabled (`if False:`) legacy branch (pre-2020.7 CGLS
