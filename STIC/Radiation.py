@@ -14,7 +14,10 @@ SPDX-License-Identifier: MIT
 
 # Component function of STIC
 
+import logging
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 def f_Twet(eastar,slopeTA,TA,slopeTD,TD,gamma):                           
     # Initialize
@@ -49,7 +52,7 @@ def f_Twet(eastar,slopeTA,TA,slopeTD,TD,gamma):
         TwetOLD = TwetNEW
         steps = steps + 1  
 
-    print('Number of iterations for Twet calculation: ',steps)
+    logger.debug("Number of iterations for Twet calculation: %s", steps)
 
     Twet = TwetNEW.copy()
     dTwet = Twet - taWB

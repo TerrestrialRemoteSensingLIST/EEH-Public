@@ -14,10 +14,14 @@ SPDX-License-Identifier: MIT
 
 # Temperature and Emissivity Separation algorithm
 
+import logging
+
 import numpy as np
 
+logger = logging.getLogger(__name__)
+
 def nem(e_max, ls2, ls4, ls5, ld2, ld4, ld5):
-    print('NEM starting...')
+    logger.info("NEM starting...")
     
     N = 15   
     threshold1 = 0.007 # NET
@@ -54,12 +58,12 @@ def nem(e_max, ls2, ls4, ls5, ld2, ld4, ld5):
     for n in range(N):
         # Determine whether to continue
         if np.all(flag):
-            print('NEM module completed')
+            logger.info("NEM module completed")
             break          
         
-        print('NEM Iteration: ', n+1)
-        
-        print('Undecided pixels: ',qa[flag == 0].shape[0])
+        logger.debug("NEM Iteration: %d", n + 1)
+
+        logger.debug("Undecided pixels: %d", qa[flag == 0].shape[0])
                 
         i1 = np.logical_and(np.logical_or.reduce((radiance2[n] <= 0, radiance4[n] <= 0, radiance5[n] <= 0)), flag == 0)
         qa[i1] = -5
@@ -123,9 +127,9 @@ def nem(e_max, ls2, ls4, ls5, ld2, ld4, ld5):
     flag[l] = 1
     
     if np.all(qa):
-        print('All pixels completed')
+        logger.info("All pixels completed")
     else:
-        print('Further check needed!!')
+        logger.warning("Further check needed!!")
      
     
     return (qa, t_nem, eb2_nem, eb4_nem, eb5_nem)
@@ -133,7 +137,7 @@ def nem(e_max, ls2, ls4, ls5, ld2, ld4, ld5):
 
 #Inputs into the TES module include the at-surface radiance and atmospheric downwelling radiance
 def ecostress_tes(ls,ld,alpha1,alpha2,alpha3):
-    print('TES starting...')
+    logger.info("TES starting...")
     
     c1 = 1.19104E+8 #unit: W.m-2
     c2 = 14388 #unit: um.K
@@ -239,7 +243,7 @@ def ecostress_tes(ls,ld,alpha1,alpha2,alpha3):
     ratiob2 = eb2_nem[j3]/np.mean(np.array([eb2_nem[j3],eb4_nem[j3],eb5_nem[j3]]), axis = 0)
     ratiob4 = eb4_nem[j3]/np.mean(np.array([eb2_nem[j3],eb4_nem[j3],eb5_nem[j3]]), axis = 0)
     ratiob5 = eb5_nem[j3]/np.mean(np.array([eb2_nem[j3],eb4_nem[j3],eb5_nem[j3]]), axis = 0)
-    print('RATIO module completed')
+    logger.info("RATIO module completed")
     
 #     print('ratiob2.shape', ratiob2.shape)
     
@@ -274,7 +278,7 @@ def ecostress_tes(ls,ld,alpha1,alpha2,alpha3):
     index = np.argmax(emi_array,axis = 0)   
     t_tes[k2] = t_array[index,np.arange(t_array.shape[1])]
     
-    print('MMD module completed')
+    logger.info("MMD module completed")
     
     out_emib2[k2] = eb2_tes[k2].copy()
     out_emib4[k2] = eb4_tes[k2].copy()
@@ -303,6 +307,6 @@ def LST_Estimate(r2, r4, r5, upclear_f, dnclear_f, trans_f, alpha1, alpha2, alph
 
     (qa, emib2, emib4, emib5, lst, mmd) = ecostress_tes(ls,dnclear_f, alpha1, alpha2, alpha3) 
     
-    print('TES module completed')
+    logger.info("TES module completed")
     
     return (lst, emib2, emib4, emib5, mmd, qa)

@@ -18,6 +18,7 @@ import fnmatch
 import glob
 import hashlib
 import json
+import logging
 import os
 import sys
 import re
@@ -28,6 +29,8 @@ from concurrent.futures import ThreadPoolExecutor
 import numpy as np
 import pandas as pd
 import xarray as xr
+
+logger = logging.getLogger(__name__)
 
 from ReadData_EEH_GPP_final_TH import (
     regex_extract_ecostress, Create_cloud_mask, read_geo, Extract_STIC,
@@ -82,21 +85,20 @@ def build_local_pattern_map(directory, pattern, label=None,
             dir_mtime = os.path.getmtime(directory) if os.path.isdir(directory) else 0
             cache_mtime = os.path.getmtime(cache_path)
             if dir_mtime > cache_mtime:
-                print(f'[{label}] Directory changed since cache was built -> rescanning')
+                logger.info("[%s] Directory changed since cache was built -> rescanning", label)
             else:
                 try:
                     with open(cache_path, 'r') as f:
                         file_map = json.load(f)
-                    print(f'[{label}] Using cached file-name map '
-                          f'({len(file_map)} entries) from {cache_path}')
+                    logger.info("[%s] Using cached file-name map (%d entries) from %s",
+                               label, len(file_map), cache_path)
                     return file_map
                 except Exception as e:
-                    print(f'[{label}] Warning: failed to read cache {cache_path} '
-                          f'({e}) -> rescanning directory')
+                    logger.warning("[%s] Failed to read cache %s (%s) -> rescanning", label, cache_path, e)
 
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory not found for '{label}': {directory}")
-    print(f'[{label}] Scanning {directory} (this may take a while on slow/networked storage)...')
+    logger.info("[%s] Scanning %s (this may take a while on slow/networked storage)...", label, directory)
     regex = re.compile(pattern)
     with os.scandir(directory) as it:
         entries = sorted(it, key=lambda e: e.name)
@@ -113,22 +115,22 @@ def build_local_pattern_map(directory, pattern, label=None,
         key = m.group(1)
         if key in file_map:
             if fname > file_map[key]:
-                print(f'[{label}] Note: preferring more recent "{fname}" over '
-                      f'"{file_map[key]}" for key "{key}"')
+                logger.debug("[%s] Preferring more recent %s over %s for key %s",
+                             label, fname, file_map[key], key)
                 file_map[key] = fname
             continue
         file_map[key] = fname
     if not file_map:
-        print(f'[{label}] Warning: no files matching pattern found in {directory}')
+        logger.warning("[%s] No files matching pattern found in %s", label, directory)
     else:
-        print(f'[{label}] Found {len(file_map)} matching files in {directory}')
+        logger.info("[%s] Found %d matching files in %s", label, len(file_map), directory)
     if cache_path and file_map:
         try:
             with open(cache_path, 'w') as f:
                 json.dump(file_map, f)
-            print(f'[{label}] Cached {len(file_map)} entries to {cache_path}')
+            logger.debug("[%s] Cached %d entries to %s", label, len(file_map), cache_path)
         except Exception as e:
-            print(f'[{label}] Warning: failed to write cache {cache_path}: {e}')
+            logger.warning("[%s] Failed to write cache %s: %s", label, cache_path, e)
     return file_map
 
 
@@ -161,21 +163,20 @@ def list_local_files_cached(directory, pattern='*', label=None,
             dir_mtime = os.path.getmtime(directory) if os.path.isdir(directory) else 0
             cache_mtime = os.path.getmtime(cache_path)
             if dir_mtime > cache_mtime:
-                print(f'[{label}] Directory changed since cache was built -> rescanning')
+                logger.info("[%s] Directory changed since cache was built -> rescanning", label)
             else:
                 try:
                     with open(cache_path, 'r') as f:
                         files = json.load(f)
-                    print(f'[{label}] Using cached file list '
-                          f'({len(files)} entries) from {cache_path}')
+                    logger.info("[%s] Using cached file list (%d entries) from %s",
+                               label, len(files), cache_path)
                     return files
                 except Exception as e:
-                    print(f'[{label}] Warning: failed to read cache {cache_path} '
-                          f'({e}) -> rescanning directory')
+                    logger.warning("[%s] Failed to read cache %s (%s) -> rescanning", label, cache_path, e)
 
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory not found for '{label}': {directory}")
-    print(f'[{label}] Scanning {directory} (this may take a while on slow/networked storage)...')
+    logger.info("[%s] Scanning %s (this may take a while on slow/networked storage)...", label, directory)
     with os.scandir(directory) as it:
         entries = sorted(it, key=lambda e: e.name)
     files = []
@@ -189,16 +190,16 @@ def list_local_files_cached(directory, pattern='*', label=None,
             continue
         files.append(os.path.join(directory, fname))
     if not files:
-        print(f'[{label}] Warning: no files matching pattern found in {directory}')
+        logger.warning("[%s] No files matching pattern found in %s", label, directory)
     else:
-        print(f'[{label}] Found {len(files)} matching files in {directory}')
+        logger.info("[%s] Found %d matching files in %s", label, len(files), directory)
     if cache_path and files:
         try:
             with open(cache_path, 'w') as f:
                 json.dump(files, f)
-            print(f'[{label}] Cached {len(files)} entries to {cache_path}')
+            logger.debug("[%s] Cached %d entries to %s", label, len(files), cache_path)
         except Exception as e:
-            print(f'[{label}] Warning: failed to write cache {cache_path}: {e}')
+            logger.warning("[%s] Failed to write cache %s: %s", label, cache_path, e)
     return files
 
 def build_all_caches(geo_dir, cld_dir, parh_dir, lai_dir, fvc_dir, era5_dir, oco2_dir, glc30_dir,
@@ -243,7 +244,7 @@ def build_all_caches(geo_dir, cld_dir, parh_dir, lai_dir, fvc_dir, era5_dir, oco
 # ---------------------------------------------------------------------------
 def run_GPP(stic_file, writepath, map_cld, map_geo, files_PARH, files_lai, files_fvc,
             files_era5, files_oco2, files_GLC30, directory_cld, directory_geo, df_LUT):
-    print(stic_file)
+    logger.info("Processing %s", stic_file)
     # Extract orbit & time details
     orbit_str, scene_str, year_str, month_str, day_str, hour_str, min_str, sec_str = regex_extract_ecostress(stic_file)
     year, month, day, hour, minute = int(year_str), int(month_str), int(day_str), int(hour_str), int(min_str)
@@ -256,33 +257,33 @@ def run_GPP(stic_file, writepath, map_cld, map_geo, files_PARH, files_lai, files
     geo_key = 'ECOv002_L1B_GEO_' + key_eco
     cld_key = 'ECOv002_L2_CLOUD_' + key_eco
     if geo_key not in map_geo or cld_key not in map_cld:
-        print("Corresponding GEO/CLOUD data not available")
+        logger.warning("[%s] Skipped — GEO/CLOUD companion file not available", orbit_id)
         return
     path_geo = os.path.join(directory_geo, map_geo[geo_key])
     path_cld = os.path.join(directory_cld, map_cld[cld_key])
 
     if not all([path_geo, path_cld, stic_file]):
-        print("Corresponding data not available")
+        logger.warning("[%s] Skipped — path to GEO, CLOUD or STIC file is empty", orbit_id)
         return
 
     # exit if cloudy image (>75%) to save time
     try:
         start_time = time.time()
         mask_cld = Create_cloud_mask(path_cld)
-        print(f"Reading Cloud file done in {time.time() - start_time:.2f} seconds")
+        logger.debug("[%s] Cloud file read in %.2f s", orbit_id, time.time() - start_time)
         cld_percent = 1 - np.mean(mask_cld)
         if cld_percent >= 0.75:
-            print(f'too many cloud cover {int(cld_percent * 100)}%, pass')
+            logger.info("[%s] Skipped — cloud cover %d%% >= 75%%", orbit_id, int(cld_percent * 100))
             return
     except Exception as e:
-        print(f"Error processing Cloud file: {e}")
+        logger.error("[%s] Skipped — error reading Cloud file: %s", orbit_id, e)
         return
 
     # get lat, lon, SZA from ECOSTRESS metadata
     eco_lat, eco_lon, eco_sza = read_geo(path_geo)
     sza_max = np.max(eco_sza)
     if sza_max > 90:
-        print(f'Skip night time with high SZA:{sza_max}')
+        logger.info("[%s] Skipped — nighttime (SZA max %.1f > 90)", orbit_id, sza_max)
         return
 
     lat_max, lat_min, lon_max, lon_min = (np.nanmax(eco_lat), np.nanmin(eco_lat),
@@ -294,13 +295,13 @@ def run_GPP(stic_file, writepath, map_cld, map_geo, files_PARH, files_lai, files
         start_time = time.time()
         (ETD, gt) = Extract_STIC(stic_file, mask_cld)
         valid_percent = np.mean(ETD > 0)
-        print(valid_percent)
+        logger.debug("[%s] Valid ETD fraction: %.4f", orbit_id, valid_percent)
         if valid_percent == 0:
-            print("There is no valid ETD>0, GPP output will be full of NaN")
+            logger.info("[%s] Skipped — no valid ETD > 0 (output would be all NaN)", orbit_id)
             return
-        print(f"{stic_file} \nExtracting STIC results done in {time.time() - start_time:.2f} seconds")
+        logger.debug("[%s] STIC extraction done in %.2f s", orbit_id, time.time() - start_time)
     except Exception as e:
-        print(f"Error extracting STIC result: {e}")
+        logger.error("[%s] Skipped — error extracting STIC result: %s", orbit_id, e)
         return
 
     #####################################################################################
@@ -308,34 +309,34 @@ def run_GPP(stic_file, writepath, map_cld, map_geo, files_PARH, files_lai, files
     #####################################################################################
     path_PARH_matches = [p for p in files_PARH if f"PARin{year_str}{month_str}{day_str}" in p]
     if not path_PARH_matches:
-        print(f"No PARH file found for {year_str}{month_str}{day_str}")
+        logger.warning("[%s] Skipped — no PARH file for %s%s%s", orbit_id, year_str, month_str, day_str)
         return
     path_PARH = path_PARH_matches[0]
     PARH, PARmean = extract_PAR_from_global_data(path_PARH, eco_bound, hour, minute)
     PARH_70m = wrap_to_ECOSTRESS(PARH, eco_lat, eco_lon)
     PARDmean_70m = wrap_to_ECOSTRESS(PARmean, eco_lat, eco_lon)
-    print("PARH done")
+    logger.debug("[%s] PARH done", orbit_id)
 
     LAI_300m = interpolate_LAI_value(year, month, day, files_lai, eco_bound)
     LAI_70m = wrap_to_ECOSTRESS(LAI_300m, eco_lat, eco_lon)
     FVC_300m = interpolate_FVC_value(year, month, day, files_fvc, eco_bound)
     FVC_70m = wrap_to_ECOSTRESS(FVC_300m, eco_lat, eco_lon)
-    print("LAI FVC done")
+    logger.debug("[%s] LAI/FVC done", orbit_id)
 
     files_era5_single = [f for f in files_era5 if 'single' in f]
     t2m_ERA5_10km, vpd_ERA5_10km = interpolate_ERA5_value(year, month, day, hour, minute, files_era5_single, eco_bound)
     temp_70m = wrap_to_ECOSTRESS(t2m_ERA5_10km, eco_lat, eco_lon)
     vpd_70m = wrap_to_ECOSTRESS(vpd_ERA5_10km, eco_lat, eco_lon)
-    print("ERA5 done")
+    logger.debug("[%s] ERA5 done", orbit_id)
 
     oco2_50km = read_oco2(year, month, day, eco_bound, files_oco2)
     oco2_70m = wrap_to_ECOSTRESS(oco2_50km, eco_lat, eco_lon)
-    print("OCO2 done")
+    logger.debug("[%s] OCO2 done", orbit_id)
 
     list_path_GLC30 = [p for p in files_GLC30 if filter_tile_bounds(p, eco_bound)]
     glc70m = read_and_wrap_GLC30(list_path_GLC30, eco_lat, eco_lon, eco_bound, year)
     glc70m = glc70m.fillna(0).astype(int)
-    print("GLC30 done")
+    logger.debug("[%s] GLC30 done", orbit_id)
 
     inputs = {
         "ETD": ETD,
@@ -353,7 +354,7 @@ def run_GPP(stic_file, writepath, map_cld, map_geo, files_PARH, files_lai, files
     code_to_pft = {v: k for k, v in GLC30_mapper.items()}
     unique_codes = np.unique(glc70m.values[~np.isnan(glc70m.values)]).astype(int)
     if len(unique_codes) == 1 and unique_codes[0] == -9999:
-        print("No vegetation tile -> ignored")
+        logger.info("[%s] Skipped — no vegetation tile (GLC30 all fill values)", orbit_id)
         return
     elif -9999 in unique_codes:
         unique_codes = np.where(unique_codes == -9999, 0, unique_codes)
@@ -435,14 +436,14 @@ def run_batch(stic_files, output_path, geo_dir, cld_dir, parh_dir, lai_dir, fvc_
     log pattern).
     """
     map_error = {}
-    print('Building local file-name caches (parallel scan)...')
+    logger.info("Building local file-name caches (parallel scan)...")
     caches = build_all_caches(
         geo_dir, cld_dir, parh_dir, lai_dir, fvc_dir, era5_dir, oco2_dir, glc30_dir,
         geo_pattern, cloud_pattern, parh_pattern, lai_pattern, fvc_pattern,
         era5_pattern, oco2_pattern, glc30_pattern,
         cache_dir=cache_dir, force_rebuild=force_rebuild_cache,
     )
-    print('Done caching.')
+    logger.info("Done caching.")
 
     map_geo = caches['geo']
     map_cld = caches['cloud']
@@ -460,8 +461,7 @@ def run_batch(stic_files, output_path, geo_dir, cld_dir, parh_dir, lai_dir, fvc_
             run_GPP(stic_file, output_path, map_cld, map_geo, parh_files, lai_files, fvc_files,
                     era5_files, oco2_files, glc30_files, cld_dir, geo_dir, df_LUT)
         except Exception:
-            traceback.print_exc()
-            print(f'Error while processing {stic_file} -> skipping')
+            logger.error("Error processing %s — skipping", stic_file, exc_info=True)
             map_error[stic_file] = traceback.format_exc()
 
     if map_error:
@@ -470,7 +470,7 @@ def run_batch(stic_files, output_path, geo_dir, cld_dir, parh_dir, lai_dir, fvc_
         error_log_path = os.path.join(error_log_dir, f'execution_{pid}_errors.txt')
         with open(error_log_path, 'w') as f:
             f.write(json.dumps(map_error))
-        print(f'Some files failed to process, see {error_log_path}')
+        logger.warning("Some files failed to process, see %s", error_log_path)
 
 
 # ---------------------------------------------------------------------------
@@ -564,6 +564,11 @@ def build_arg_parser():
 
 
 def main(argv=None):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 
@@ -613,7 +618,7 @@ def main(argv=None):
         force_rebuild_cache=args.force_rebuild_cache,
         error_log_dir=args.error_log_dir,
     )
-    print("All done.")
+    logger.info("All done.")
     sys.stdout.flush()
     #os._exit(0)
 

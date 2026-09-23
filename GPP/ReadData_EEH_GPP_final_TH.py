@@ -31,6 +31,9 @@ import geopandas as gpd
 from pyhdf.SD import SD, SDC
 from scipy.interpolate import griddata
 
+import logging
+logger = logging.getLogger(__name__)
+
 
 def load_S3_paths(path_txt):  # 'S3_file_paths_V3.txt'
     """Kept for backward compatibility: parses a flat 'category: path' text
@@ -230,7 +233,7 @@ def read_and_wrap_GLC30(list_tif, lat_eco, lon_eco, eco_bound, year):
             glc30_grid = xr.where(valid, glc30_grid, da_aligned)
 
         except Exception as e:
-            print(f"Error processing {path}: {e}")
+            logger.error("Error processing %s: %s", path, e)
 
         # SAV: Grass and Shrub found in Africa between latitude 15N and 30S
         scaled = glc30_grid.data
@@ -296,7 +299,7 @@ def timetransform(time):
 def regex_extract_ecostress(filename):
     pattern = r".*_(\d+)_(\d+)_(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2}).*"
     match = re.search(pattern, filename)
-    print(f"Searching {pattern} in {filename}")
+    logger.debug("Searching %s in %s", pattern, filename)
     if match:
         orbit_str = match.group(1)
         scene_str = match.group(2)
@@ -308,7 +311,7 @@ def regex_extract_ecostress(filename):
         sec_str = match.group(8)
         return (orbit_str, scene_str, year_str, month_str, day_str, hour_str, min_str, sec_str)
     else:
-        print("No match found in file name.")
+        logger.warning("No match found in file name: %s", filename)
         return None
 
 
@@ -607,7 +610,7 @@ def find_lai_path(files_lai, year, month, day):
         date_str_prev = f"_{year_prev:04d}{month:02d}{day:02d}"
         matches_prev = [p for p in files_lai if date_str_prev in p]
         if matches_prev:
-            print(f"Warning: Falling back to previous year {year_prev} for {month:02d}-{day:02d}")
+            logger.warning("Falling back to previous year %d for %02d-%02d", year_prev, month, day)
             return matches_prev[0]
         else:
             raise FileNotFoundError(f"No LAI file found for {month:02d}-{day:02d} in {year} or {year_prev}")
@@ -627,7 +630,7 @@ def read_oco2(year, month, day, eco_bound, files_oco2):
         month_day_str = f"{month:02d}{day:02d}"
         date_matches = [f for f in files_oco2 if f"{month_day_str}_" in f]
         if not date_matches:
-            print(f"No OCO2 file found for month {month:02d} day {day:02d}")
+            logger.warning("No OCO2 file found for month %02d day %02d", month, day)
             return None
 
         def extract_year(f):
@@ -644,7 +647,7 @@ def read_oco2(year, month, day, eco_bound, files_oco2):
         ds = extract_from_global_data(oco2_path, eco_bound, variable='XCO2')
         return ds
     except Exception as e:
-        print(f"Error reading OCO2 file: {e}")
+        logger.error("Error reading OCO2 file: %s", e)
         return None
 
 
@@ -778,7 +781,7 @@ def gpp_gs_calculator(gt, CO2, T_C, VPD_hPa):
 def generate_hdf5_file_GPP(directory_output, dict_outputs, key_eco):
     base_filename = f'EEH2STIC_L3_GPP_{key_eco}_0000_00.h5'
     filename = os.path.join(directory_output, base_filename)
-    print("Writing output to : " + filename)
+    logger.info("Writing output to: %s", filename)
     with h5py.File(filename, 'w') as f_h5:
         dset = f_h5.create_dataset('GPPd', data=np.float32(dict_outputs['GPPd']))
         dset.attrs['long_name'] = 'Daily gross primary productivity'
@@ -841,6 +844,6 @@ def generate_hdf5_file_GPP(directory_output, dict_outputs, key_eco):
         dset.attrs['fill_value'] = 0
         dset.attrs['scale_factor'] = 1
         dset.attrs['add_offset'] = 0
-    print("GPP Output Completed")
+    logger.info("GPP output completed")
 
     return base_filename

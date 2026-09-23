@@ -18,6 +18,7 @@ import argparse
 import glob
 import hashlib
 import json
+import logging
 import os
 import re
 import traceback
@@ -31,6 +32,8 @@ from AtmCorrection import runRTTOV
 from ReadECOL1BData import Read_L1B_Data
 from ReadERA5Data import Read_ERA5
 from TES_vec import LST_Estimate
+
+logger = logging.getLogger(__name__)
 
 
 # Processing domain (N, W, S, E). ERA5 is only retrieved over this box, so a
@@ -54,7 +57,7 @@ def processing_domain():
             n, w, s, e = (float(v) for v in raw.split(','))
             return n, w, s, e
         except ValueError:
-            print(f'[warn] cannot parse EEH2_DOMAIN={raw!r} -> using default domain')
+            logger.warning("cannot parse EEH2_DOMAIN=%r -> using default domain", raw)
     return DOMAIN_DEFAULT
 
 
@@ -126,20 +129,20 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
             dir_mtime = os.path.getmtime(directory_geo) if os.path.isdir(directory_geo) else 0
             cache_mtime = os.path.getmtime(cache_path)
             if dir_mtime > cache_mtime:
-                print(f'[GEO] Directory changed since cache was built -> rescanning')
+                logger.info("[GEO] Directory changed since cache was built -> rescanning")
             else:
                 try:
                     with open(cache_path, 'r') as f:
                         geo_map = json.load(f)
-                    print(f'[GEO] Using cached file-name map ({len(geo_map)} entries) from {cache_path}')
+                    logger.info("[GEO] Using cached file-name map (%d entries) from %s", len(geo_map), cache_path)
                     return geo_map
                 except Exception as e:
-                    print(f'[GEO] Warning: failed to read cache {cache_path} ({e}) -> rescanning directory')
+                    logger.warning("[GEO] failed to read cache %s (%s) -> rescanning directory", cache_path, e)
 
     if not os.path.isdir(directory_geo):
         raise FileNotFoundError(f"GEO directory not found: {directory_geo}")
 
-    print(f'[GEO] Scanning {directory_geo} (this may take a while on slow/networked storage)...')
+    logger.info("[GEO] Scanning %s (this may take a while on slow/networked storage)...", directory_geo)
 
     # Sort entries by name first for a deterministic scan order, independent
     # of the underlying filesystem's (unordered) os.scandir() iteration order.
@@ -159,23 +162,23 @@ def build_local_geo_map(directory_geo, key_index1=0, key_index2=41,
         key = fname[key_index1:key_index2]
         if key in geo_map:
             if fname > geo_map[key]:
-                print(f'[GEO] Note: preferring "{fname}" over "{geo_map[key]}" for key "{key}"')
+                logger.debug("[GEO] Note: preferring %r over %r for key %r", fname, geo_map[key], key)
                 geo_map[key] = fname
             continue
         geo_map[key] = fname
 
     if not geo_map:
-        print(f'[GEO] Warning: no GEO files found in {directory_geo}')
+        logger.warning("[GEO] no GEO files found in %s", directory_geo)
     else:
-        print(f'[GEO] Found {len(geo_map)} matching files in {directory_geo}')
+        logger.info("[GEO] Found %d matching files in %s", len(geo_map), directory_geo)
 
     if cache_path and geo_map:
         try:
             with open(cache_path, 'w') as f:
                 json.dump(geo_map, f)
-            print(f'[GEO] Cached {len(geo_map)} entries to {cache_path}')
+            logger.debug("[GEO] Cached %d entries to %s", len(geo_map), cache_path)
         except Exception as e:
-            print(f'[GEO] Warning: failed to write cache {cache_path}: {e}')
+            logger.warning("[GEO] failed to write cache %s: %s", cache_path, e)
 
     return geo_map
 
@@ -265,7 +268,7 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
     """
     if rttov_lib_preload:
         import ctypes
-        print(f'Preloading RTTOV wrapper library from {rttov_lib_preload}')
+        logger.info("Preloading RTTOV wrapper library from %s", rttov_lib_preload)
         ctypes.CDLL(rttov_lib_preload)
 
     map_error = dict()
@@ -275,21 +278,21 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
                                    force_rebuild=force_rebuild_cache)
 
     for filename_rad in rad_files:
-        print('Run Temperature Emissivity Separation algorithm on ECOSTRESS data ' + filename_rad)
+        logger.info("Run Temperature Emissivity Separation algorithm on ECOSTRESS data %s", filename_rad)
         try:
             (lat_eco, lon_eco, alt_eco, lf, _, vza, sza, year, month, day, hour, minute, second,
              r2, rqa2, r4, rqa4, r5, rqa5,
              date_str, hour_str, min_str, sec_str, orbit_str) = Read_L1B_Data(filename_rad, directory_geo, map_geo)
         except Exception:
             traceback.print_exc()
-            print('Error while opening L1B Data -> stopping there')
+            logger.error("Error while opening L1B Data -> stopping there")
             map_error[filename_rad] = traceback.format_exc()
             continue
-        print('Reading ECOSTRESS L1B data completed')
+        logger.info("Reading ECOSTRESS L1B data completed")
 
         inside, domain_msg = in_processing_domain(lat_eco, lon_eco)
         if not inside:
-            print(f'Granule outside the processing domain ({domain_msg}) -> skipping')
+            logger.warning("Granule outside the processing domain (%s) -> skipping", domain_msg)
             map_skipped[filename_rad] = domain_msg
             continue
 
@@ -307,7 +310,7 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
         watermask_agg = np.ones((nrow, ncol))
         watermask_agg[lf_agg > 0.5] = 0  # Land
 
-        print('Aggregating ECOSTRESS L1B data completed')
+        logger.info("Aggregating ECOSTRESS L1B data completed")
 
         try:
             (p_era5, new_t, new_q, new_q2m, new_t2m, new_skt, _) = Read_ERA5(
@@ -315,11 +318,11 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             new_q[new_q < 0.1e-10] = 0.1e-10
         except Exception:
             traceback.print_exc()
-            print('Error while opening ERA5 Data -> stopping there')
+            logger.error("Error while opening ERA5 Data -> stopping there")
             map_error[filename_rad] = traceback.format_exc()
             continue
 
-        print('Reading and interpolating ERA5 data completed')
+        logger.info("Reading and interpolating ERA5 data completed")
 
         # Calculate surface pressure based on the ECOSTRESS altitude data
         sp = 1013.25 * (1.0 - 2.225577e-5 * alt_eco_agg) ** 5.25588  # Altitude unit: m
@@ -336,11 +339,11 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             )
         except Exception:
             traceback.print_exc()
-            print('Error while running RTTOV -> stopping there')
+            logger.error("Error while running RTTOV -> stopping there")
             map_error[filename_rad] = traceback.format_exc()
             continue
 
-        print('Running RTTOV completed')
+        logger.info("Running RTTOV completed")
 
         # Convert from 1-dimension to 3-dimension
         upclear = upclear0.reshape(lat_eco_agg.shape[0], lat_eco_agg.shape[1], 3)
@@ -357,17 +360,17 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
         for band in range(3):
             z = np.ravel(upclear[:, :, band])
             upclear_f[:, :, band] = griddata(xy, z, (lon_eco, lat_eco), method='nearest')
-        print('Interpolating RTTOV upL output completed')
+        logger.info("Interpolating RTTOV upL output completed")
 
         for band in range(3):
             z = np.ravel(dnclear[:, :, band])
             dnclear_f[:, :, band] = griddata(xy, z, (lon_eco, lat_eco), method='nearest')
-        print('Interpolating RTTOV dnL output completed')
+        logger.info("Interpolating RTTOV dnL output completed")
 
         for band in range(3):
             z = np.ravel(trans[:, :, band])
             trans_f[:, :, band] = griddata(xy, z, (lon_eco, lat_eco), method='nearest')
-        print('Interpolating RTTOV trans output completed')
+        logger.info("Interpolating RTTOV trans output completed")
 
         # Single-coefficient-set TES estimation (no A1/A2/A3 loop)
         try:
@@ -381,19 +384,18 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
             # Creating mask for the invalid values
             mask = np.logical_or.reduce((rqa2 > 1, rqa4 > 1, rqa5 > 1, lst == 0, bbe == 0))
 
-            print('Estimating LST completed')
+            logger.info("Estimating LST completed")
             generate_hdf5_file(directory_output, lst, emib2, emib4, emib5, bbe, mask, qa,
                                 orbit_str, date_str, hour_str, min_str, sec_str)
-            print('Outputting to HDF5 completed')
+            logger.info("Outputting to HDF5 completed")
         except Exception:
             traceback.print_exc()
-            print('Error -> stopping there')
+            logger.error("Error -> stopping there")
             map_error[filename_rad] = traceback.format_exc()
 
     processed = len(rad_files) - len(map_error) - len(map_skipped)
-    print(f'\nTES summary: {processed} processed, {len(map_skipped)} outside the '
-          f'processing domain, {len(map_error)} failed '
-          f'(out of {len(rad_files)} granule(s))')
+    logger.info("TES summary: %d processed, %d outside the processing domain, %d failed "
+                "(out of %d granule(s))", processed, len(map_skipped), len(map_error), len(rad_files))
 
     if map_error:
         pid = str(os.getpid())
@@ -401,7 +403,7 @@ def run_TES(rad_files, directory_geo, directory_era5, directory_output,
         error_log_path = os.path.join(error_log_dir, f'execution_{pid}_errors.txt')
         with open(error_log_path, 'w') as file:
             file.write(json.dumps(map_error))
-        print(f'Some files failed to process, see {error_log_path}')
+        logger.warning("Some files failed to process, see %s", error_log_path)
 
 
 def build_arg_parser():
@@ -483,6 +485,12 @@ def build_arg_parser():
 
 
 def main(argv=None):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 

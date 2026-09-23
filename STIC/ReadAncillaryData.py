@@ -14,6 +14,7 @@ SPDX-License-Identifier: MIT
 
 # Functions for reading the ancillary CGLS NDVI, albedo_dir, albedo_hem and LULC data
 
+import logging
 import netCDF4 as nc
 import numpy as np
 import os
@@ -21,6 +22,8 @@ import calendar
 from pyhdf.SD import SD, SDC
 from datetime import datetime
 from osgeo import gdal
+
+logger = logging.getLogger(__name__)
 
 def warp_raster(x,y,variable):
     #This function aims at finding the matching data for ecostress swath
@@ -193,7 +196,7 @@ def Read_FVC(directory_fvc,latitude,longitude,year_str,month_str,day_str,map_fvc
     key_fvc = year_str + month_str + sday     
     filename_fvc = map_fvc[key_fvc]
     filename = os.path.join(directory_fvc,filename_fvc)
-    print('Opening FVC file='+filename)
+    logger.info("Opening FVC file=%s", filename)
 
     f_fvc = nc.Dataset(filename)   
     #Extract the corresponding fvc 
@@ -293,7 +296,7 @@ def Read_ALB_DIR(directory_alb_dir,latitude,longitude,year_str,month_str,day_str
         filename_alb_dir = map_albdir2[key_albdir]
         filename = os.path.join(directory_alb_dir,filename_alb_dir)
     
-        print('Reading file '+filename)
+        logger.info("Reading file %s", filename)
         f_alb = SD(filename, SDC.READ)
         #Extract the corresponding albedo
         var_alb = f_alb.select('Albedo_BSA_shortwave')
@@ -446,21 +449,21 @@ def Read_Ancillary(directory_fvc,directory_alb_dir,directory_alb_hem,
     #Read FVC data
     fvc = Read_FVC(directory_fvc,latitude,longitude,year_str,month_str,day_str,map_fvc)
     
-    print('Reading FVC data finished!')
+    logger.info("Reading FVC data finished!")
     
     #Read directional-hemispherical albedo data
     alb_dir = Read_ALB_DIR(directory_alb_dir,latitude,longitude,year_str,month_str,day_str,map_albdir1,map_albdir2)
     
-    print('Reading ALB_DIR data finished!')
+    logger.info("Reading ALB_DIR data finished!")
     
     #Read bi-hemispherical albedo data
     alb_hem = Read_ALB_HEM(directory_alb_hem,latitude,longitude,year_str,month_str,day_str,map_albhem1,map_albhem2)
     
-    print('Reading ALB_HEM data finished!')
+    logger.info("Reading ALB_HEM data finished!")
     
     #Read LULC data 
     lulc = Read_LULC(directory_lulc,latitude,longitude,year_str)
     
-    print('Reading LULC data finished!')
+    logger.info("Reading LULC data finished!")
  
     return (fvc,alb_dir,alb_hem,lulc)

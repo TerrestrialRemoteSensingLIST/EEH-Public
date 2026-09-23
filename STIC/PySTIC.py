@@ -14,9 +14,12 @@ SPDX-License-Identifier: MIT
 
 # Component function of STIC
 
+import logging
 import numpy as np
 from Radiation import *
 from SMWetness import *
+
+logger = logging.getLogger(__name__)
 
 # Constants
 sigma = 5.67e-8     # Stefan-Boltzmann constant
@@ -276,7 +279,7 @@ def STIC(TS,etas,TA,RH,sr_dir,sr_dif,alb_dir,alb_hem,fc,ttSEC):
     
     while(np.nanmax(error_LHF) > threshold and steps < 15):    
         index = np.where(converged)
-        print('converged pixels: ',index[0].shape[0])
+        logger.debug("converged pixels: %s", index[0].shape[0])
         
         # Selecting valid and non-converged pixels
         i = np.logical_and(mask,~converged)
@@ -362,7 +365,7 @@ def STIC(TS,etas,TA,RH,sr_dir,sr_dif,alb_dir,alb_hem,fc,ttSEC):
         
     LHF = LHFnew.copy()
 
-    print('Number of iterations = ', steps)
+    logger.info("Number of iterations = %s", steps)
 
     # Final output from the STIC model
     RN_STIC = RN

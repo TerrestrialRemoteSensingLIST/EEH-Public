@@ -18,6 +18,7 @@ import argparse
 import glob
 import hashlib
 import json
+import logging
 import os
 import re
 import traceback
@@ -26,6 +27,8 @@ from datetime import datetime
 
 import h5py
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 from ReadECOSTRESSData import Read_ECOSTRESS
 from ReadAncillaryData import Read_Ancillary
@@ -76,22 +79,23 @@ def build_local_pattern_map(directory, pattern, label=None,
             dir_mtime = os.path.getmtime(directory) if os.path.isdir(directory) else 0
             cache_mtime = os.path.getmtime(cache_path)
             if dir_mtime > cache_mtime:
-                print(f'[{label}] Directory changed since cache was built -> rescanning')
+                logger.info("[%s] Directory changed since cache was built -> rescanning", label)
             else:
                 try:
                     with open(cache_path, 'r') as f:
                         file_map = json.load(f)
-                    print(f'[{label}] Using cached file-name map '
-                          f'({len(file_map)} entries) from {cache_path}')
+                    logger.info("[%s] Using cached file-name map (%s entries) from %s",
+                               label, len(file_map), cache_path)
                     return file_map
                 except Exception as e:
-                    print(f'[{label}] Warning: failed to read cache {cache_path} '
-                          f'({e}) -> rescanning directory')
+                    logger.warning("[%s] Failed to read cache %s (%s) -> rescanning directory",
+                                 label, cache_path, e)
 
     if not os.path.isdir(directory):
         raise FileNotFoundError(f"Directory not found for '{label}': {directory}")
 
-    print(f'[{label}] Scanning {directory} (this may take a while on slow/networked storage)...')
+    logger.info("[%s] Scanning %s (this may take a while on slow/networked storage)...",
+                label, directory)
 
     regex = re.compile(pattern)
 
@@ -114,8 +118,8 @@ def build_local_pattern_map(directory, pattern, label=None,
         key = m.group(1)
         if key in file_map:
             if fname > file_map[key]:
-                print(f'[{label}] Note: preferring more recent "{fname}" over '
-                      f'"{file_map[key]}" for key "{key}"')
+                logger.debug("[%s] Note: preferring more recent %r over %r for key %r",
+                             label, fname, file_map[key], key)
                 file_map[key] = fname
             # else: existing entry is already the lexicographically greatest
             # (i.e. the most recent reprocessing round / production run) -> keep it silently.
@@ -123,17 +127,17 @@ def build_local_pattern_map(directory, pattern, label=None,
         file_map[key] = fname
 
     if not file_map:
-        print(f'[{label}] Warning: no files matching pattern found in {directory}')
+        logger.warning("[%s] No files matching pattern found in %s", label, directory)
     else:
-        print(f'[{label}] Found {len(file_map)} matching files in {directory}')
+        logger.info("[%s] Found %s matching files in %s", label, len(file_map), directory)
 
     if cache_path and file_map:
         try:
             with open(cache_path, 'w') as f:
                 json.dump(file_map, f)
-            print(f'[{label}] Cached {len(file_map)} entries to {cache_path}')
+            logger.debug("[%s] Cached %s entries to %s", label, len(file_map), cache_path)
         except Exception as e:
-            print(f'[{label}] Warning: failed to write cache {cache_path}: {e}')
+            logger.warning("[%s] Failed to write cache %s: %s", label, cache_path, e)
 
     return file_map
 
@@ -189,7 +193,7 @@ def generate_raster_file(driver, filename, data, x_dim, y_dim,
         raster.FlushCache()
         del raster
     except Exception:
-        print(f'Failed to generate file {filename}')
+        logger.error("Failed to generate file %s", filename)
 
 
 def adjust_lulc(lulc):
@@ -215,7 +219,7 @@ def generate_hdf5_file(directory_output, ET, H, G, Rn, gah, gsc, Ms, Mrz, ETD,
     base_filename = ('EEH2STIC_L3_ET_' + orbit_str + '_' + date_str + 'T'
                       + hour_str + min_str + sec_str + '_0000_00.h5')
     filename = os.path.join(directory_output, base_filename)
-    print("Writing output to: " + filename)
+    logger.info("Writing output to: %s", filename)
     f_h5 = h5py.File(filename, 'w')
 
     dset = f_h5.create_dataset('LE', data=np.float32(ET))
@@ -309,7 +313,7 @@ def generate_hdf5_file(directory_output, ET, H, G, Rn, gah, gsc, Ms, Mrz, ETD,
     dset.attrs['add_offset'] = 0
 
     f_h5.close()
-    print("STIC Model Running Completed")
+    logger.info("STIC Model Running Completed")
 
     return base_filename
 
@@ -359,7 +363,7 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
     """
     map_error = dict()
 
-    print('Building local file-name caches (parallel scan)...')
+    logger.info("Building local file-name caches (parallel scan)...")
     map_geo, map_cloud, map_fvc, map_albdir2 = build_all_caches(
         directory_geo, directory_cld, directory_fvc, directory_alb_mota,
         geo_pattern, cloud_pattern, fcover_pattern, mota_pattern,
@@ -372,10 +376,10 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
     map_albdir1 = {}
     map_albhem1 = {}
     map_albhem2 = map_albdir2
-    print('Done caching.')
+    logger.info("Done caching.")
 
     for filename_lste in lste_files:
-        print('Run STIC model on ECOSTRESS data ' + filename_lste)
+        logger.info("Run STIC model on ECOSTRESS data %s", filename_lste)
 
         try:
             (lst_eco, lse_eco, lat_eco, lon_eco, _, watermask, cloudmask,
@@ -384,7 +388,7 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
                 filename_lste, directory_geo, directory_cld, map_geo, map_cloud)
         except Exception:
             traceback.print_exc()
-            print('Error while reading ECOSTRESS data -> stopping there')
+            logger.error("Error while reading ECOSTRESS data -> stopping there")
             map_error[filename_lste] = traceback.format_exc()
             continue
 
@@ -411,7 +415,7 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
         lst_eco[watermask == 1] = np.nan
         lse_eco[watermask == 1] = np.nan
 
-        print('Reading ECOSTRESS data finished!')
+        logger.info("Reading ECOSTRESS data finished!")
 
         try:
             (fvc, alb_dir, alb_hem, lulc) = Read_Ancillary(
@@ -419,10 +423,10 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
                 lat_eco, lon_eco, year, month, day,
                 map_fvc, map_albdir1, map_albdir2, map_albhem1, map_albhem2)
             lulc_adjusted = adjust_lulc(lulc)
-            print('Reading ancillary CGLS data finished!')
+            logger.info("Reading ancillary CGLS data finished!")
         except Exception:
             traceback.print_exc()
-            print('Error while reading ancillary data -> stopping there')
+            logger.error("Error while reading ancillary data -> stopping there")
             map_error[filename_lste] = traceback.format_exc()
             continue
 
@@ -431,10 +435,10 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
                 directory_era5, lat_eco, lon_eco, year, month, day, hour, minute, second)
             t_s = t_s - 273.15   # Converting from K to Celsius degree
             rh_s = rh_s * 100    # Converting from 0-1 to percentage
-            print('Reading ERA5 data finished!')
+            logger.info("Reading ERA5 data finished!")
         except Exception:
             traceback.print_exc()
-            print('Error while reading ERA5 data -> stopping there')
+            logger.error("Error while reading ERA5 data -> stopping there")
             map_error[filename_lste] = traceback.format_exc()
             continue
 
@@ -442,7 +446,7 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
             (RN_STIC, G_STIC, H_STIC, LE_STIC, gah_STIC, gsc_STIC,
              T0_STIC, Ms_STIC, Mrz_STIC, converged, Lin, Lout, Lnet, Sin, Sout) = STIC(
                 lst_eco, lse_eco, t_s, rh_s, sr_dir, sr_dif, alb_dir, alb_hem, fvc, time_ls)
-            print('Running the STIC model finished!')
+            logger.info("Running the STIC model finished!")
 
             # Mask out the invalid pixels
             RN_STIC[np.isnan(RN_STIC)] = -9999
@@ -497,10 +501,10 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
             generate_hdf5_file(directory_output, LE_STIC, H_STIC, G_STIC, RN_STIC,
                                 gah_STIC, gsc_STIC, Ms_STIC, Mrz_STIC, ET_DLY,
                                 orbit_str, date_str, hour_str, min_str, sec_str)
-            print('Outputting to HDF5 file finished')
+            logger.info("Outputting to HDF5 file finished")
         except Exception:
             traceback.print_exc()
-            print('Error -> stopping there')
+            logger.error("Error -> stopping there")
             map_error[filename_lste] = traceback.format_exc()
 
     if map_error:
@@ -509,7 +513,7 @@ def run_STIC(lste_files, directory_geo, directory_cld, directory_fvc,
         error_log_path = os.path.join(error_log_dir, f'execution_{pid}_errors.txt')
         with open(error_log_path, 'w') as file:
             file.write(json.dumps(map_error))
-        print(f'Some files failed to process, see {error_log_path}')
+        logger.warning("Some files failed to process, see %s", error_log_path)
 
 
 # ---------------------------------------------------------------------------
@@ -586,6 +590,12 @@ def build_arg_parser():
 
 
 def main(argv=None):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+
     parser = build_arg_parser()
     args = parser.parse_args(argv)
 

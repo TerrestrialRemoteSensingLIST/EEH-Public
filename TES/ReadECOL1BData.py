@@ -14,11 +14,15 @@ SPDX-License-Identifier: MIT
 
 # Read the ECOSTRESS L1B_GEO and L1B_RAD data
 
-import h5py
-import numpy as np
-import glob
+import logging
 import os
 from datetime import datetime, timedelta
+
+import glob
+import h5py
+import numpy as np
+
+logger = logging.getLogger(__name__)
 
 def timetransform(time):
     t = datetime(2000, 1, 1, 12, 0) + timedelta(seconds=time)
@@ -66,7 +70,7 @@ def Read_L1B_Data(filename_rad,directory_geo,map_geo):
     filename_geo = 'ECOv002_L1B_GEO_' + orbit_str + '_' + date_str + 'T' + hour_str + min_str + sec_str
     geo_match = map_geo[filename_geo]
     filename = os.path.join(directory_geo,geo_match)
-    print(filename)
+    logger.info("GEO file: %s", filename)
     f_geo = h5py.File(filename, 'r')
     
     lat_eco = np.array(f_geo['Geolocation']['latitude']) #[-90,90]

@@ -14,10 +14,13 @@ SPDX-License-Identifier: MIT
 
 # Functions for reading the ECOSTRESS L2_LSTE, L1B_GEO and L2_CLOUD data 
 
+import logging
 import h5py
 import numpy as np
 import os
 from datetime import datetime,timedelta
+
+logger = logging.getLogger(__name__)
 
 def timetransform(time):
     t = datetime(2000, 1, 1, 12, 0) + timedelta(seconds=time)
@@ -37,7 +40,7 @@ def substring(string,n):
 def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_cloud_files):
     ########Read LST and LSE data###########
     f_lste = h5py.File(filename_lste, 'r')
-    print('Opening ECOSTRESS LSTE data finished')
+    logger.info("Opening ECOSTRESS LSTE data finished")
     
     lst = np.array(f_lste['LST']).astype(float)
     #lst = np.array(f_lste['SDS']['LST']).astype(float)
@@ -61,7 +64,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     #Substract the orbit and track information
     orbit_str = filename_lste[-36:-27]
     
-    print('Reading ECOSTRESS LSTE data finished!')
+    logger.info("Reading ECOSTRESS LSTE data finished!")
     
     #########Read geolocation############
     #Compose the filename of geolocation file
@@ -69,10 +72,10 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     filename_geo = 'ECOv002_L1B_GEO_' + orbit_str + '_' + date_str + 'T' + hour_str + min_str + sec_str
     geo_match = map_geo_files[filename_geo]
     filename = os.path.join(directory_geo,geo_match)
-    print(f"Trying to read GEO file:{filename}")
+    logger.info("Trying to read GEO file: %s", filename)
     f_geo = h5py.File(filename, 'r')
     
-    print('Opening ECOSTRESS Geolocation data finished')
+    logger.info("Opening ECOSTRESS Geolocation data finished")
     lat_eco = np.array(f_geo['Geolocation']['latitude']) #[-90,90]
     lon_eco = np.array(f_geo['Geolocation']['longitude']) #[-180,180]
     alt_eco = np.array(f_geo['Geolocation']['height']) #Unit: m
@@ -90,7 +93,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     f_geo.close()
     del f_geo,lf
     
-    print('Reading ECOSTRESS geolocation data finished!')
+    logger.info("Reading ECOSTRESS geolocation data finished!")
     
     #########Read cloud mask#########
     #Compose the filename of cloudmask file
@@ -100,7 +103,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     filename = os.path.join(directory_cld,cloud_match)
     f_cld = h5py.File(filename, 'r')
     
-    print('Opening ECOSTRESS cloud mask finished')
+    logger.info("Opening ECOSTRESS cloud mask finished")
     
     cld_eco = np.array(f_cld['SDS']['Cloud_final'])
     
@@ -117,7 +120,7 @@ def Read_ECOSTRESS(filename_lste,directory_geo,directory_cld,map_geo_files,map_c
     f_cld.close()
     del f_cld
     
-    print('Reading ECOSTRESS cloud mask data finished!')
+    logger.info("Reading ECOSTRESS cloud mask data finished!")
     
     return (lst,lse,lat_eco,lon_eco,alt_eco,watermask,cmask,year,month,day,hour,minute,second,
          date_str,hour_str,min_str,sec_str,orbit_str,prj_wkt)

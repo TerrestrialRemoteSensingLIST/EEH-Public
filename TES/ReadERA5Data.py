@@ -14,10 +14,14 @@ SPDX-License-Identifier: MIT
 
 # Read the ERA5 data
 
+import logging
+import os
+from datetime import datetime, timedelta
+
 import cfgrib
 import numpy as np
-import os
-from datetime import datetime,timedelta
+
+logger = logging.getLogger(__name__)
 
 # Linear interpolation function
 def linearinterp(time, variables):
@@ -131,7 +135,7 @@ def Read_ERA5(directory_era5,lat_eco,lon_eco,year,month,day,hour,minute,second):
     for i in range(2):
         #Atmospheric profiles at 37 levels
         base_filename = 'era5_37levels-' + era5_filename[i] + ':00.grib'
-        print('Reading ERA5 file '+base_filename)
+        logger.info("Reading ERA5 file %s", base_filename)
         filename = os.path.join(directory_era5,base_filename)
 
         ds_t = cfgrib.open_dataset(filename,engine='cfgrib',backend_kwargs={'filter_by_keys': {'shortName': 't'}, 'indexpath': ''})
@@ -152,7 +156,7 @@ def Read_ERA5(directory_era5,lat_eco,lon_eco,year,month,day,hour,minute,second):
         
         #Atmospheric profiles at the surface level
         base_filename1 = 'era5_single_levels-' + era5_filename[i] + ':00.grib'
-        print('Reading ERA5 file '+base_filename1)
+        logger.info("Reading ERA5 file %s", base_filename1)
         filename1 = os.path.join(directory_era5,base_filename1)
 
         #Data from the single level profile

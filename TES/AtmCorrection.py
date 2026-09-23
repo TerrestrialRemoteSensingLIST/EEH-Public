@@ -14,10 +14,13 @@ SPDX-License-Identifier: MIT
 
 # Atmospheric correction
 
+import logging
 import os
 import sys
 
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 
 def _load_pyrttov(rttov_wrapper_dir):
@@ -101,7 +104,7 @@ def runRTTOV(p_era5, new_t, new_q, new_sp, new_q2m, new_t2m, new_skt, vza, sza, 
     # [t,salinity,snowfraction,foamfraction,fastem(1:5),specularity]
     skin = np.zeros((nprofiles, 10))
     skin[:, 0] = new_skt
-    print(skin.shape)
+    logger.debug("skin.shape: %s", skin.shape)
     myProfiles.Skin = skin
     # [satzenith,satazimuth,sunzenith,sunazimuth]
     angle = np.zeros((nprofiles, 4))
@@ -121,7 +124,7 @@ def runRTTOV(p_era5, new_t, new_q, new_sp, new_q2m, new_t2m, new_skt, vza, sza, 
     # [year,month,day,hour,minute,second], not currently used by RTTOV, only month info used for emissivity selection
     time = np.array([int(year_str), int(month_str), int(day_str), 0, 0, 0], dtype=np.int32)
     myProfiles.DateTimes = expand2nprofiles(time, nprofiles)
-    print('Step 1 finished!')
+    logger.info("Step 1 finished!")
 
     #######################################################
     # 2. Set up Rttov instance for the ECOSTRESS instrument
@@ -142,14 +145,14 @@ def runRTTOV(p_era5, new_t, new_q, new_sp, new_q2m, new_t2m, new_skt, vza, sza, 
         sys.stderr.write("Error loading instrument(s): {!s}".format(e))
         sys.exit(1)
     Rttov.Profiles = myProfiles
-    print('Step 2 finished!')
+    logger.info("Step 2 finished!")
 
     ##########################################
     # 3. Load the emissivity and BRDF atlases
     ##########################################
     surfemisrefl = np.zeros((2, nprofiles, nchans), dtype=np.float64)
     Rttov.SurfEmisRefl = surfemisrefl
-    print('Step 3 finished!')
+    logger.info("Step 3 finished!")
 
     ############################################################################################
     # 4. Run RTTOV at specific VZAs to retrieve transmittance and atmospheric upwelling radiance
@@ -159,10 +162,10 @@ def runRTTOV(p_era5, new_t, new_q, new_sp, new_q2m, new_t2m, new_skt, vza, sza, 
     except pyrttov.RttovError as e:
         sys.stderr.write("Error running RTTOV direct model: {!s}".format(e))
     if hasattr(Rttov, "Rad2UpClear"):
-        print("Rad2UpClear existe, valeur :", Rttov.Rad2UpClear)
+        logger.debug("Rad2UpClear exists, value: %s", Rttov.Rad2UpClear)
     else:
-        print("Rad2UpClear n'existe pas !")
-    print('Step 4 finished!')
+        logger.warning("Rad2UpClear does not exist!")
+    logger.info("Step 4 finished!")
     trans = Rttov.TauTotal  # transmittance, output atmospheric parameter 1
     upclear = Rttov.Rad2UpClear  # output atmospheric parameter 2
     # convert all the radiances from mW/cm-1/sr/m2 to W/um/sr/m2
@@ -180,7 +183,7 @@ def runRTTOV(p_era5, new_t, new_q, new_sp, new_q2m, new_t2m, new_skt, vza, sza, 
         Rttov.runDirect()
     except pyrttov.RttovError as e:
         sys.stderr.write("Error running RTTOV direct model: {!s}".format(e))
-    print('Step 5 finished!')
+    logger.info("Step 5 finished!")
     dnclear = Rttov.Rad2DnClear  # output atmospheric parameter 3
     dnclear1 = dnclear * wn ** 2 * 1E-7
 
