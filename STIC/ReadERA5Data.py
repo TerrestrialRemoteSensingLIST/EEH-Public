@@ -15,11 +15,34 @@ SPDX-License-Identifier: MIT
 #Functions for reading the ERA5 data
 
 import cfgrib
+import logging
 import numpy as np
 import os
 from datetime import datetime,timedelta
 
+logger = logging.getLogger(__name__)
+
 #Linear interpolation function
+def _grid_span(axis, lo, hi):
+    """Index range of `axis` covering [lo, hi], clamped to the axis itself.
+
+    The ERA5 grid origin follows EEH2_DOMAIN, so it has to be read from the
+    file. Deriving indices from the default domain's corner (75, -20) instead
+    made every narrowed domain slice out of range: the slices came back empty
+    and STIC died on `np.min` of a zero-size array.
+    """
+    step = abs(float(axis[1] - axis[0]))
+    if float(axis[0]) > float(axis[-1]):        # descending, as ERA5 latitude
+        i1 = int(np.floor((float(axis[0]) - hi) / step))
+        i2 = int(np.ceil((float(axis[0]) - lo) / step))
+    else:
+        i1 = int(np.floor((lo - float(axis[0])) / step))
+        i2 = int(np.ceil((hi - float(axis[0])) / step))
+    i1 = max(i1, 0)
+    i2 = min(max(i2, i1), len(axis) - 1)
+    return i1, i2
+
+
 def linearinterp(time, variables):
     y1 = variables[0]
     y2 = variables[1]
@@ -123,22 +146,15 @@ def Read_ERA5(directory_era5,lat_eco,lon_eco,year,month,day,hour,minute,second):
     era5_ta_filename.append(filename4)
     era5_ta_filename.append(filename5)
 
-    #Crop the global ERA5 data to the spatial range of the whole ECOSTRESS image
-    #ERA5 data is from lat: 75 to -35, from lon: -20 to 60
+    #Crop the ERA5 data to the spatial range of the whole ECOSTRESS image.
+    #The grid extent follows EEH2_DOMAIN, so it is read from the file below
+    #rather than assumed to be the default lat 75..-35, lon -20..60.
     max_lat = np.amax(lat_eco)
     min_lat = np.amin(lat_eco)
     max_lon = np.amax(lon_eco)
     min_lon = np.amin(lon_eco)
-    
-    max_lat = np.clip(max_lat, -35, 75)   # Latitudes entre -35 et 75
-    min_lat = np.clip(min_lat, -35, 75)
-    max_lon = np.clip(max_lon, -20, 60)   # Longitudes entre -20 et 60
-    min_lon = np.clip(min_lon, -20, 60)
 
-    row1 = np.floor((75 - max_lat)/0.25).astype(int)
-    row2 = np.ceil((75 - min_lat)/0.25).astype(int)
-    col1 = np.floor((min_lon + 20)/0.25).astype(int)
-    col2 = np.ceil((max_lon + 20)/0.25).astype(int)
+    row1 = row2 = col1 = col2 = None
 
     sp_array = []
     t2m_array = []
@@ -152,7 +168,24 @@ def Read_ERA5(directory_era5,lat_eco,lon_eco,year,month,day,hour,minute,second):
         
         #Surface pressure (Pa)
         ds_sp = cfgrib.open_dataset(filename,engine='cfgrib',backend_kwargs={'filter_by_keys': {'shortName': 'sp'}, 'indexpath': ''})
-        sp = ds_sp.sp.data[row1:row2+1,col1:col2+1] 
+        if row1 is None:
+            lat_axis = ds_sp.latitude.data
+            lon_axis = ds_sp.longitude.data
+            row1, row2 = _grid_span(lat_axis, min_lat, max_lat)
+            col1, col2 = _grid_span(lon_axis, min_lon, max_lon)
+            if (min_lat < np.amin(lat_axis) or max_lat > np.amax(lat_axis)
+                    or min_lon < np.amin(lon_axis) or max_lon > np.amax(lon_axis)):
+                # Not fatal: the interpolation clamps to the grid edge below.
+                # Worth saying, because the granule then carries edge values for
+                # every pixel outside the grid, and ERA5 filenames record no
+                # extent, so a cached narrow-domain file looks identical.
+                logger.warning(
+                    "granule lat [%.2f, %.2f] lon [%.2f, %.2f] exceeds the ERA5 "
+                    "grid lat [%.2f, %.2f] lon [%.2f, %.2f] — outside pixels "
+                    "use edge values", min_lat, max_lat, min_lon, max_lon,
+                    float(np.amin(lat_axis)), float(np.amax(lat_axis)),
+                    float(np.amin(lon_axis)), float(np.amax(lon_axis)))
+        sp = ds_sp.sp.data[row1:row2+1,col1:col2+1]
         sp_array.append(sp) 
         
         lat_era5 = ds_sp.latitude.data[row1:row2+1]
