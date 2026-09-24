@@ -180,7 +180,13 @@ def check_directories(report):
 def check_credentials(report):
     log.info("Credentials (presence only, never values)")
     for var, used_for in CREDENTIALS:
-        state = "set" if os.environ.get(var) else "unset — downloads for %s will fail" % used_for
+        val = os.environ.get(var)
+        if val:
+            state = "set"
+        elif val is not None:
+            state = "empty — downloads for %s will fail" % used_for
+        else:
+            state = "unset — downloads for %s will fail" % used_for
         report.note(var, state)
 
 
