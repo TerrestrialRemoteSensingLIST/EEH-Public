@@ -38,6 +38,7 @@ from __future__ import annotations
 import argparse
 import calendar
 import io
+import logging
 import os
 import re
 import sys
@@ -48,6 +49,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 
 import requests
+
+logger = logging.getLogger(__name__)
 
 # ---------------------------------------------------------------------------
 # Reference orbit
@@ -86,7 +89,7 @@ def processing_domain() -> tuple[float, float, float, float]:
             n, w, s, e = (float(v) for v in raw.split(","))
             return n, w, s, e
         except ValueError:
-            print(f"  [warn] cannot parse EEH2_DOMAIN={raw!r} — using default domain")
+            logger.warning(f"cannot parse EEH2_DOMAIN={raw!r} — using default domain")
     return DOMAIN_DEFAULT
 
 
@@ -213,29 +216,29 @@ def _download_file(session: requests.Session, url: str, dest: Path,
     Returns True on success, False if all retries exhausted.
     """
     if dest.exists():
-        print(f"  [skip] {dest.name}")
+        logger.info(f"  [skip] {dest.name}")
         return True
     for attempt in range(1, max_retries + 1):
         try:
-            print(f"  [download] {dest.name} ...")
+            logger.info(f"  [download] {dest.name} ...")
             resp = session.get(url, allow_redirects=True, timeout=300)
             resp.raise_for_status()
             dest.parent.mkdir(parents=True, exist_ok=True)
             dest.write_bytes(resp.content)
-            print(f"  [ok] {dest.name} ({len(resp.content) / 1e6:.1f} MB)")
+            logger.info(f"  [ok] {dest.name} ({len(resp.content) / 1e6:.1f} MB)")
             return True
         except (requests.exceptions.HTTPError,
                 requests.exceptions.ConnectionError,
                 requests.exceptions.Timeout) as exc:
             status = getattr(getattr(exc, "response", None), "status_code", None)
             if status and status < 500 and status != 429:
-                print(f"  [FAIL] {dest.name} — HTTP {status} (not retryable)")
+                logger.info(f"  [FAIL] {dest.name} — HTTP {status} (not retryable)")
                 return False
             wait = RETRY_BACKOFF * (2 ** (attempt - 1))
-            print(f"  [retry {attempt}/{max_retries}] {dest.name} — {exc} "
+            logger.info(f"  [retry {attempt}/{max_retries}] {dest.name} — {exc} "
                   f"(waiting {wait}s)")
             time.sleep(wait)
-    print(f"  [FAIL] {dest.name} — gave up after {max_retries} retries")
+    logger.info(f"  [FAIL] {dest.name} — gave up after {max_retries} retries")
     return False
 
 
@@ -281,27 +284,27 @@ def download_ecostress(session: requests.Session, output_dir: Path,
     bbox = None if whole_orbit else processing_domain()
     if bbox:
         n, w, s, e = bbox
-        print(f"\n  Processing domain: lat [{s}, {n}], lon [{w}, {e}] — granules "
+        logger.info(f"\n  Processing domain: lat [{s}, {n}], lon [{w}, {e}] — granules "
               "outside it are skipped (--whole-orbit to download them anyway)")
     domain_keys = _domain_scene_keys(session, orbit_key, bbox) if bbox else None
     if domain_keys is not None and not domain_keys:
-        print("  [warn] no granule intersects the processing domain on this date")
+        logger.warning("no granule intersects the processing domain on this date")
     total, failed = 0, 0
     for label, concept_id, subdir in products:
-        print(f"\n--- {label} ({filter_msg}) ---")
+        logger.info(f"\n--- {label} ({filter_msg}) ---")
         entries = _search_cmr(session, concept_id, TEMPORAL, orbit_key)
         if domain_keys is not None:
             inside = [e for e in entries
                       if _scene_key(e.get("title", "")) in domain_keys]
             outside = len(entries) - len(inside)
             if outside:
-                print(f"  {outside} of {len(entries)} granule(s) outside the "
+                logger.info(f"  {outside} of {len(entries)} granule(s) outside the "
                       "processing domain — not downloaded")
             entries = inside
         if not entries:
-            print(f"  [warn] No {label} granules found ({filter_msg})")
+            logger.warning(f"No {label} granules found ({filter_msg})")
             continue
-        print(f"  Found {len(entries)} {label} granule(s)")
+        logger.info(f"  Found {len(entries)} {label} granule(s)")
         dest_dir = output_dir / subdir
         for entry in entries:
             href = entry["links"][0]["href"]
@@ -313,7 +316,7 @@ def download_ecostress(session: requests.Session, output_dir: Path,
 
 
 def download_mota(session: requests.Session, output_dir: Path) -> None:
-    print("\n--- MCD43C3 (MOTA) ---")
+    logger.info("\n--- MCD43C3 (MOTA) ---")
     dt = datetime.strptime(DATE, "%Y-%m-%d")
     target_doy = dt.timetuple().tm_yday
     target_key = f"A{dt.year}{target_doy:03d}"
@@ -327,13 +330,13 @@ def download_mota(session: requests.Session, output_dir: Path) -> None:
         "temporal": mota_temporal,
     })
     if not entries:
-        print(f"  [warn] No MOTA granules for {DATE}")
+        logger.warning(f"No MOTA granules for {DATE}")
         return
     dest_dir = output_dir / "mota"
     # Prefer the granule matching the exact DOY
     exact = [e for e in entries if target_key in e.get("title", "")]
     to_download = exact[:1] if exact else entries[:1]
-    print(f"  Target DOY: {target_key}, found {len(entries)} granules, "
+    logger.info(f"  Target DOY: {target_key}, found {len(entries)} granules, "
           f"exact match: {len(exact)}")
     for entry in to_download:
         href = entry["links"][0]["href"]
@@ -384,7 +387,7 @@ def _oco2_on_disk(dest_dir: Path, target_date: str) -> Path | None:
 
 
 def download_oco2(session: requests.Session, output_dir: Path) -> None:
-    print("\n--- OCO-2 GEOS L3 CO2 ---")
+    logger.info("\n--- OCO-2 GEOS L3 CO2 ---")
     dest_dir = output_dir / "oco2"
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -393,17 +396,17 @@ def download_oco2(session: requests.Session, output_dir: Path) -> None:
     # None for any month and day outside that fortnight.
     have = _oco2_on_disk(dest_dir, DATE)
     if have:
-        print(f"  [skip] {have.name} already covers {DATE}")
+        logger.info(f"  [skip] {have.name} already covers {DATE}")
         return
 
     wanted = _oco2_target_date(DATE)
     if wanted is None:
         first, last = OCO2_COVERAGE
-        print(f"  [warn] {DATE} has no counterpart in OCO-2 coverage "
+        logger.warning(f"{DATE} has no counterpart in OCO-2 coverage "
               f"({first} to {last}) - GPP will have no CO2 input")
         return
     if wanted.strftime("%Y%m%d") != DATE.replace("-", ""):
-        print(f"  Outside OCO-2 coverage; using the same day of {wanted.year}: "
+        logger.info(f"  Outside OCO-2 coverage; using the same day of {wanted.year}: "
               f"{wanted}")
 
     entries = _cmr_all({
@@ -411,9 +414,9 @@ def download_oco2(session: requests.Session, output_dir: Path) -> None:
         "temporal": f"{wanted}T00:00:00Z,{wanted}T23:59:59Z",
     })
     if not entries:
-        print("  [warn] No OCO-2 granules found")
+        logger.warning("No OCO-2 granules found")
         return
-    print(f"  Found {len(entries)} OCO-2 granules")
+    logger.info(f"  Found {len(entries)} OCO-2 granules")
     for entry in entries:
         links = [lk["href"] for lk in entry.get("links", [])
                  if lk.get("href", "").endswith(".nc4")]
@@ -430,7 +433,7 @@ def _get_cdse_token() -> str | None:
     username = os.environ.get("CDSE_USERNAME", "")
     password = os.environ.get("CDSE_PASSWORD", "")
     if not username or not password:
-        print("  [skip] CDSE_USERNAME/CDSE_PASSWORD not set — skipping FCOVER/LAI")
+        logger.info("  [skip] CDSE_USERNAME/CDSE_PASSWORD not set — skipping FCOVER/LAI")
         return None
     resp = requests.post(CDSE_TOKEN_URL, data={
         "grant_type": "password",
@@ -542,7 +545,7 @@ def _download_clms_product(token: str, product: dict, dest_dir: Path) -> None:
                 if product_name.endswith("_nc") else product_name)
     score = _clms_rt_score(product_name)
     rt_label = f"RT{score}" if score < 100 else "final"
-    print(f"  [download] {filename} ({rt_label}) ...")
+    logger.info(f"  [download] {filename} ({rt_label}) ...")
 
     dl_url = (f"https://zipper.dataspace.copernicus.eu/odata/v1"
               f"/Products({product['Id']})/$value")
@@ -556,14 +559,14 @@ def _download_clms_product(token: str, product: dict, dest_dir: Path) -> None:
         with zipfile.ZipFile(io.BytesIO(content)) as zf:
             nc_files = [n for n in zf.namelist() if n.endswith(".nc")]
             if not nc_files:
-                print("  [warn] no .nc inside the archive")
+                logger.warning("no .nc inside the archive")
                 return
             data = zf.read(nc_files[0])
     except zipfile.BadZipFile:
         data = content
 
     (dest_dir / filename).write_bytes(data)
-    print(f"  [ok] {filename} ({len(data) / 1e6:.1f} MB)")
+    logger.info(f"  [ok] {filename} ({len(data) / 1e6:.1f} MB)")
 
 
 def download_fcover_lai(output_dir: Path) -> None:
@@ -574,7 +577,7 @@ def download_fcover_lai(output_dir: Path) -> None:
     required = _clms_required_dates(DATE)
 
     for product_key, subdir in [("FCOVER300", "fcover"), ("LAI300", "lai")]:
-        print(f"\n--- {product_key} (CDSE) ---")
+        logger.info(f"\n--- {product_key} (CDSE) ---")
         dest_dir = output_dir / subdir
         dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -590,7 +593,7 @@ def download_fcover_lai(output_dir: Path) -> None:
         missing = []
         for want in required:
             if want in on_disk:
-                print(f"  [skip] composite {want} already in {subdir}/ "
+                logger.info(f"  [skip] composite {want} already in {subdir}/ "
                       f"({on_disk[want]})")
             else:
                 missing.append(want)
@@ -616,7 +619,7 @@ def download_fcover_lai(output_dir: Path) -> None:
         resp.raise_for_status()
         products = resp.json().get("value", [])
         if not products:
-            print(f"  [warn] no {product_key} products found on CDSE")
+            logger.warning(f"no {product_key} products found on CDSE")
             continue
 
         by_date: dict[str, list[dict]] = {}
@@ -630,7 +633,7 @@ def download_fcover_lai(output_dir: Path) -> None:
                 # No neighbouring composite is substituted: GPP selects by name
                 # and would only raise StopIteration on it later, further from
                 # the cause.
-                print(f"  [WARN] composite {want} is not published by CLMS yet "
+                logger.warning(f"composite {want} is not published by CLMS yet "
                       f"— {product_key} stays incomplete for {DATE}")
                 continue
             best = max(by_date[want],
@@ -717,7 +720,7 @@ def _extract_par_archive(zf: zipfile.ZipFile, dest_dir: Path) -> Path | None:
                         break
                     out.write(chunk)
         if not _is_valid_par_netcdf(tmp):
-            print(f"  [warn] {info.filename} in the archive is not a readable "
+            logger.warning(f"{info.filename} in the archive is not a readable "
                   "NetCDF")
             return None
         tmp.replace(dest)
@@ -746,7 +749,7 @@ def repair_par_archives(output_dir: Path) -> None:
             with zipfile.ZipFile(nc) as zf:
                 extracted = _extract_par_archive(zf, dest_dir)
         except (OSError, zipfile.BadZipFile) as err:
-            print(f"  [warn] cannot read {nc.name} as an archive: {err}")
+            logger.warning(f"cannot read {nc.name} as an archive: {err}")
             continue
         if extracted is None:
             # No usable PARin inside (a PARdm/PARmm archive, or a damaged one).
@@ -754,20 +757,20 @@ def repair_par_archives(output_dir: Path) -> None:
             # failing GPP, so move it out of the way.
             quarantined = nc.with_suffix(".nc.zip")
             nc.replace(quarantined)
-            print(f"  [warn] {nc.name} holds no usable {PAR_PRODUCT_PREFIX} "
+            logger.warning(f"{nc.name} holds no usable {PAR_PRODUCT_PREFIX} "
                   f"NetCDF — set aside as {quarantined.name}")
             continue
         size_mb = extracted.stat().st_size / 1e6
         if extracted.resolve() != nc.resolve():
             nc.unlink()
-        print(f"  [fix] {nc.name} was a ZIP — extracted {extracted.name} "
+        logger.info(f"  [fix] {nc.name} was a ZIP — extracted {extracted.name} "
               f"({size_mb:.1f} MB)")
 
 
 def download_par(output_dir: Path) -> bool:
     """Download half-hourly PAR (PARin) from EUMETSAT Data Store via eumdac.
     Returns True if PAR files are available after this call."""
-    print("\n--- PAR half-hourly (CM SAF SARAH) ---")
+    logger.info("\n--- PAR half-hourly (CM SAF SARAH) ---")
     dest_dir = output_dir / "parh"
     dest_dir.mkdir(parents=True, exist_ok=True)
     repair_par_archives(output_dir)
@@ -778,19 +781,19 @@ def download_par(output_dir: Path) -> bool:
     ymd = DATE.replace("-", "")
     if any(_is_valid_par_netcdf(f)
            for f in dest_dir.glob(f"{PAR_PRODUCT_PREFIX}{ymd}*.nc")):
-        print(f"  [skip] {PAR_PRODUCT_PREFIX} files for {DATE} already present")
+        logger.info(f"  [skip] {PAR_PRODUCT_PREFIX} files for {DATE} already present")
         return True
 
     consumer_key = os.environ.get("EUMETSAT_CONSUMER_KEY", "")
     consumer_secret = os.environ.get("EUMETSAT_CONSUMER_SECRET", "")
     if not consumer_key or not consumer_secret:
-        print("  [skip] EUMETSAT_CONSUMER_KEY/SECRET not set")
+        logger.info("  [skip] EUMETSAT_CONSUMER_KEY/SECRET not set")
         return False
 
     try:
         import eumdac
     except ImportError:
-        print("  [skip] eumdac not installed — run: pip install eumdac")
+        logger.info("  [skip] eumdac not installed — run: pip install eumdac")
         return False
 
     token = eumdac.AccessToken((consumer_key, consumer_secret))
@@ -799,21 +802,21 @@ def download_par(output_dir: Path) -> bool:
     try:
         collection = datastore.get_collection(EUMETSAT_SARAH_COLLECTION)
     except Exception as e:
-        print(f"  [warn] Cannot access collection {EUMETSAT_SARAH_COLLECTION}: {e}")
+        logger.warning(f"Cannot access collection {EUMETSAT_SARAH_COLLECTION}: {e}")
         return False
 
-    print(f"  Searching collection {EUMETSAT_SARAH_COLLECTION} ...")
+    logger.info(f"  Searching collection {EUMETSAT_SARAH_COLLECTION} ...")
     products = list(collection.search(dtstart=DATE, dtend=DATE))
-    print(f"  Found {len(products)} product(s) in SARAH-3 for {DATE}")
+    logger.info(f"  Found {len(products)} product(s) in SARAH-3 for {DATE}")
 
     par_products = [p for p in products if PAR_PRODUCT_PREFIX in str(p)]
     if not par_products:
         titles = [str(p) for p in products[:5]]
-        print(f"  [warn] No {PAR_PRODUCT_PREFIX} products found "
+        logger.warning(f"No {PAR_PRODUCT_PREFIX} products found "
               f"(sample: {titles})")
         return False
 
-    print(f"  {len(par_products)} {PAR_PRODUCT_PREFIX} product(s) to download")
+    logger.info(f"  {len(par_products)} {PAR_PRODUCT_PREFIX} product(s) to download")
     count = 0
     for product in par_products:
         title = str(product)
@@ -833,17 +836,17 @@ def download_par(output_dir: Path) -> bool:
                 # be one -- never by trusting the product title.
                 dest = _write_par_netcdf(dest_dir, title, data)
             if dest is None:
-                print(f"  [warn] no usable {PAR_PRODUCT_PREFIX} NetCDF in {title}")
+                logger.warning(f"no usable {PAR_PRODUCT_PREFIX} NetCDF in {title}")
                 continue
             count += 1
-            print(f"  [ok] {dest.name} ({dest.stat().st_size / 1e6:.1f} MB)")
+            logger.info(f"  [ok] {dest.name} ({dest.stat().st_size / 1e6:.1f} MB)")
         except Exception as e:
-            print(f"  [warn] Failed to download {title}: {e}")
+            logger.warning(f"Failed to download {title}: {e}")
 
     if count == 0:
-        print(f"  [warn] No {PAR_PRODUCT_PREFIX} .nc files extracted")
+        logger.warning(f"No {PAR_PRODUCT_PREFIX} .nc files extracted")
         return False
-    print(f"  [ok] Downloaded {count} {PAR_PRODUCT_PREFIX} file(s)")
+    logger.info(f"  [ok] Downloaded {count} {PAR_PRODUCT_PREFIX} file(s)")
     return True
 
 
@@ -855,7 +858,7 @@ def _write_par_netcdf(dest_dir: Path, title: str, data: bytes) -> Path | None:
         out.write(data)
     if not _is_valid_par_netcdf(tmp):
         tmp.unlink()
-        print(f"  [warn] {title} is neither an archive nor a readable NetCDF")
+        logger.warning(f"{title} is neither an archive nor a readable NetCDF")
         return None
     fname = title.replace("/", "_").replace(chr(92), "_")
     if not fname.endswith(".nc"):
@@ -875,20 +878,20 @@ LULC_URL = (
 
 
 def download_lulc(output_dir: Path) -> None:
-    print("\n--- LULC (PROBAV LC100) ---")
+    logger.info("\n--- LULC (PROBAV LC100) ---")
     dest_dir = output_dir / "lulc"
     dest_dir.mkdir(parents=True, exist_ok=True)
     dest = dest_dir / LULC_FILENAME
     if dest.exists():
-        print(f"  [skip] {LULC_FILENAME}")
+        logger.info(f"  [skip] {LULC_FILENAME}")
         return
-    print(f"  [download] {LULC_FILENAME} (~1.6 GB) ...")
+    logger.info(f"  [download] {LULC_FILENAME} (~1.6 GB) ...")
     resp = requests.get(LULC_URL, stream=True)
     resp.raise_for_status()
     with open(dest, "wb") as f:
         for chunk in resp.iter_content(chunk_size=8192 * 1024):
             f.write(chunk)
-    print(f"  [ok] {LULC_FILENAME} ({dest.stat().st_size / 1e9:.2f} GB)")
+    logger.info(f"  [ok] {LULC_FILENAME} ({dest.stat().st_size / 1e9:.2f} GB)")
 
 
 # ── GLC30 / GLC_FCS30D (Zenodo, tiles by longitude strip) ────────────────
@@ -998,14 +1001,14 @@ def _union_boxes_in_domain(boxes, label: str) -> tuple | None:
         lon_lo, lon_hi = min(lon_lo, c_lon_lo), max(lon_hi, c_lon_hi)
 
     if total == 0:
-        print(f"  [warn] no {label} to build the footprint from")
+        logger.warning(f"no {label} to build the footprint from")
         return None
     if not kept:
-        print(f"  [warn] none of the {total} {label} intersect "
+        logger.warning(f"none of the {total} {label} intersect "
               "the processing domain")
         return None
     if outside:
-        print(f"  footprint from {kept} of {total} {label} "
+        logger.info(f"  footprint from {kept} of {total} {label} "
               f"({outside} outside the processing domain)")
     return (lat_lo, lat_hi, lon_lo, lon_hi)
 
@@ -1039,7 +1042,7 @@ def _cmr_geo_boxes(orbit: str | None, date: str) -> list[tuple]:
     try:
         entries = _cmr_all(params)
     except requests.RequestException as err:
-        print(f"  [warn] CMR footprint lookup failed: {err}")
+        logger.warning(f"CMR footprint lookup failed: {err}")
         return []
 
     boxes = []
@@ -1092,7 +1095,7 @@ def _get_orbit_bbox(output_dir: Path, orbit: str | None = None,
             try:
                 boxes.append(_geo_granule_box(gf))
             except (OSError, KeyError) as err:
-                print(f"  [warn] cannot read {gf.name} for the footprint: {err}")
+                logger.warning(f"cannot read {gf.name} for the footprint: {err}")
         return _union_boxes_in_domain(boxes, "GEO granule(s) on disk")
 
     if not date:
@@ -1119,7 +1122,7 @@ def _parse_zip_lon_range(filename: str) -> tuple[float, float] | None:
 
 
 def download_glc30(output_dir: Path, orbit: str | None = None) -> None:
-    print("\n--- GLC30 / GLC_FCS30D (Zenodo) ---")
+    logger.info("\n--- GLC30 / GLC_FCS30D (Zenodo) ---")
     dest_dir = output_dir / "glc30"
     dest_dir.mkdir(parents=True, exist_ok=True)
 
@@ -1128,12 +1131,12 @@ def download_glc30(output_dir: Path, orbit: str | None = None) -> None:
     # that question (see the strip check further down).
     bbox = _get_orbit_bbox(output_dir, orbit=orbit, date=DATE)
     if not bbox:
-        print("  [skip] Cannot determine orbit bbox (no GEO file yet)")
-        print("         Run ECOSTRESS download first, then re-run.")
+        logger.info("  [skip] Cannot determine orbit bbox (no GEO file yet)")
+        logger.info("         Run ECOSTRESS download first, then re-run.")
         return
 
     lat_min, lat_max, lon_min, lon_max = bbox
-    print(f"  Orbit bbox: lat [{lat_min:.1f}, {lat_max:.1f}], lon [{lon_min:.1f}, {lon_max:.1f}]")
+    logger.info(f"  Orbit bbox: lat [{lat_min:.1f}, {lat_max:.1f}], lon [{lon_min:.1f}, {lon_max:.1f}]")
 
     resp = requests.get(GLC30_API_URL)
     resp.raise_for_status()
@@ -1150,7 +1153,7 @@ def download_glc30(output_dir: Path, orbit: str | None = None) -> None:
             needed.append((zf, rng))
 
     if not needed:
-        print("  [warn] No matching longitude strips found")
+        logger.warning("No matching longitude strips found")
         return
 
     # Which 5-degree longitude strips have tiles on disk. Every strip a ZIP covers
@@ -1167,28 +1170,28 @@ def download_glc30(output_dir: Path, orbit: str | None = None) -> None:
     pending = []
     for zf, (zf_lon_min, zf_lon_max) in needed:
         if zf["key"] in fetched:
-            print(f"  [have] {zf['key']} — already downloaded")
+            logger.info(f"  [have] {zf['key']} — already downloaded")
             continue
         strips = {x for x in range(int(zf_lon_min), int(zf_lon_max), 5)
                   if x + 5 > lon_min and x < lon_max}
         if strips and strips <= on_disk_lons:
-            print(f"  [have] {zf['key']} — tiles for lon "
+            logger.info(f"  [have] {zf['key']} — tiles for lon "
                   f"{sorted(strips)} already on disk")
             continue
         pending.append(zf)
 
     if not pending:
-        print(f"  [skip] the {len(needed)} longitude strip(s) covering this "
+        logger.info(f"  [skip] the {len(needed)} longitude strip(s) covering this "
               "footprint are already present")
         return
 
-    print(f"  {len(pending)} ZIP(s) to download: {[z['key'] for z in pending]}")
+    logger.info(f"  {len(pending)} ZIP(s) to download: {[z['key'] for z in pending]}")
 
     for zf_info in pending:
         zf_name = zf_info["key"]
         zf_url = zf_info["links"]["self"]
         zf_size = zf_info.get("size", 0)
-        print(f"  [download] {zf_name} ({zf_size / 1e9:.1f} GB) ...")
+        logger.info(f"  [download] {zf_name} ({zf_size / 1e9:.1f} GB) ...")
 
         with tempfile.NamedTemporaryFile(suffix=".zip", delete=False) as tmp:
             tmp_path = Path(tmp.name)
@@ -1196,12 +1199,17 @@ def download_glc30(output_dir: Path, orbit: str | None = None) -> None:
             with requests.get(zf_url, stream=True) as r:
                 r.raise_for_status()
                 downloaded = 0
+                # Every GB, not every chunk: this archive is tens of GB and the
+                # old in-place \r counter would now be one log record per MB.
+                next_mark = 1e9
                 with open(tmp_path, "wb") as f:
                     for chunk in r.iter_content(chunk_size=1024 * 1024):
                         f.write(chunk)
                         downloaded += len(chunk)
-                        print(f"\r  [{downloaded / 1e9:.1f} / {zf_size / 1e9:.1f} GB]", end="", flush=True)
-                print()
+                        if downloaded >= next_mark:
+                            logger.info(f"  [{downloaded / 1e9:.1f} / "
+                                        f"{zf_size / 1e9:.1f} GB]")
+                            next_mark += 1e9
 
             with zipfile.ZipFile(tmp_path) as zf:
                 annual_tiles = [n for n in zf.namelist() if "Annual" in n and n.endswith(".tif")]
@@ -1211,7 +1219,7 @@ def download_glc30(output_dir: Path, orbit: str | None = None) -> None:
                     if dest.exists():
                         continue
                     dest.write_bytes(zf.read(tile_path))
-                print(f"  [ok] Extracted {len(annual_tiles)} Annual tiles from {zf_name}")
+                logger.info(f"  [ok] Extracted {len(annual_tiles)} Annual tiles from {zf_name}")
             _record_glc30_zip(dest_dir, zf_name)
         finally:
             tmp_path.unlink(missing_ok=True)
@@ -1246,12 +1254,12 @@ def _era5_required_times(output_dir: Path,
     base = datetime.strptime(DATE, "%Y-%m-%d")
     hours = _era5_granule_hours(output_dir, orbit)
     if hours:
-        print("  acquisition hours on", DATE, "—",
-              ", ".join(f"{h:02d}h" for h in hours))
+        logger.info(f"  acquisition hours on {DATE} — "
+                    + ", ".join(f"{h:02d}h" for h in hours))
         pressure = {base + timedelta(hours=h + off) for h in hours for off in (0, 1)}
         single = pressure | {base + timedelta(hours=h) for h in ERA5_TAMAX_HOURS}
     else:
-        print(f"  [warn] no ECOSTRESS granule on disk for {DATE} — "
+        logger.warning(f"no ECOSTRESS granule on disk for {DATE} — "
               "falling back to default hours")
         single = {base + timedelta(hours=h) for h in ERA5_SINGLE_HOURS}
         pressure = {base + timedelta(hours=h) for h in ERA5_PRESSURE_HOURS}
@@ -1273,7 +1281,7 @@ def _split_era5_grib(src: Path, dest_dir: Path, prefix: str,
     try:
         import eccodes
     except ImportError:
-        print("  [warn] eccodes not available — cannot split GRIB")
+        logger.warning("eccodes not available — cannot split GRIB")
         return False
 
     buckets: dict[datetime, list[bytes]] = {}
@@ -1294,24 +1302,24 @@ def _split_era5_grib(src: Path, dest_dir: Path, prefix: str,
 
     missing = [t for t in times if t not in buckets]
     if missing:
-        print("  [warn] GRIB has no messages for",
-              ", ".join(t.strftime("%H:00") for t in missing))
+        logger.warning("GRIB has no messages for "
+                       + ", ".join(t.strftime("%H:00") for t in missing))
         return False
 
     for t in times:
         _era5_path(dest_dir, prefix, t).write_bytes(b"".join(buckets[t]))
-    print(f"  [ok] split into {len(times)} hourly files")
+    logger.info(f"  [ok] split into {len(times)} hourly files")
     src.unlink(missing_ok=True)
     return True
 
 
 def download_era5(output_dir: Path, orbit: str | None = None) -> None:
-    print("\n--- ERA5 ---")
+    logger.info("\n--- ERA5 ---")
     try:
         import cdsapi
     except ImportError:
-        print("  [skip] cdsapi not installed — run: pip install cdsapi")
-        print("         Then configure ~/.cdsapirc with your CDS API key.")
+        logger.info("  [skip] cdsapi not installed — run: pip install cdsapi")
+        logger.info("         Then configure ~/.cdsapirc with your CDS API key.")
         _print_era5_filenames(output_dir, orbit)
         return
 
@@ -1350,7 +1358,7 @@ def _download_era5_dataset(client, dest_dir: Path, kind: str,
     dataset, prefix, variables, levels = ERA5_DATASETS[kind]
     missing = [t for t in times if not _era5_path(dest_dir, prefix, t).exists()]
     if not missing:
-        print(f"  [skip] {prefix} ({len(times)} hourly files exist)")
+        logger.info(f"  [skip] {prefix} ({len(times)} hourly files exist)")
         return
 
     by_day: dict[date, list[datetime]] = {}
@@ -1370,7 +1378,7 @@ def _download_era5_dataset(client, dest_dir: Path, kind: str,
         if levels:
             req["pressure_level"] = levels
         hours = ", ".join(f"{t.hour:02d}h" for t in day_times)
-        print(f"  [download] {prefix} {day} ({hours}) ...")
+        logger.info(f"  [download] {prefix} {day} ({hours}) ...")
         bulk = dest_dir / f"{prefix}-{day:%Y_%m_%d}-bulk.grib"
         client.retrieve(
             dataset,
@@ -1383,20 +1391,20 @@ def _download_era5_dataset(client, dest_dir: Path, kind: str,
             dest = _era5_path(dest_dir, prefix, t)
             if dest.exists():
                 continue
-            print(f"  [download] {prefix} {day} {t.hour:02d}h individually ...")
+            logger.info(f"  [download] {prefix} {day} {t.hour:02d}h individually ...")
             client.retrieve(dataset, {**req, "time": f"{t.hour:02d}:00"},
                             str(dest))
         bulk.unlink(missing_ok=True)
-    print(f"  [ok] {prefix}")
+    logger.info(f"  [ok] {prefix}")
 
 
 def _print_era5_filenames(output_dir: Path, orbit: str | None = None) -> None:
     single_times, pressure_times = _era5_required_times(output_dir, orbit)
-    print("\n  ERA5 files needed in", output_dir / "era5", ":")
+    logger.info(f"\n  ERA5 files needed in {output_dir / 'era5'}:")
     for prefix, times in (("era5_single_levels", single_times),
                           ("era5_37levels", pressure_times)):
         for t in times:
-            print("   ", _era5_path(Path(), prefix, t).name)
+            logger.info(f"    {_era5_path(Path(), prefix, t).name}")
 
 
 # ── S3 sync (alternative to individual downloads) ────────────────────────
@@ -1438,7 +1446,7 @@ def _get_s3_client():
     try:
         import boto3
     except ImportError:
-        print("  [skip] boto3 not installed — run: pip install boto3")
+        logger.info("  [skip] boto3 not installed — run: pip install boto3")
         return None
     return boto3.client(
         "s3",
@@ -1514,9 +1522,41 @@ def _s3_orbit_matches(fname: str, orbit: str) -> bool:
     return orbit in fname
 
 
+def _s3_domain_scene_keys(skip: set[str], orbit: str | None,
+                          whole_orbit: bool) -> set[str] | None:
+    """Scene keys inside EEH2_DOMAIN, or None when no filter applies.
+
+    The bucket carries no footprint metadata, so the domain has to be resolved
+    the same way the CMR path resolves it: ask CMR which GEO scenes intersect
+    the box, then match S3 filenames on the shared {orbit}_{scene} key. Without
+    this, a narrowed EEH2_DOMAIN was silently ignored whenever S3 was reachable
+    and the sync pulled the whole orbit — hundreds of GB for a few useful
+    granules. Degrades to None (no filter) rather than aborting: an S3-only
+    deployment may have no Earthdata credentials at all.
+    """
+    if whole_orbit or {"rad", "geo", "cloud"} <= skip:
+        return None
+    bbox = processing_domain()
+    if not bbox:
+        return None
+    try:
+        keys = _domain_scene_keys(_earthdata_session(), orbit or "", bbox)
+    except Exception as e:
+        logger.warning(f"domain filter unavailable ({e}) — S3 sync will not "
+                       "apply EEH2_DOMAIN")
+        return None
+    n, w, s, e_ = bbox
+    logger.info(f"\n  Processing domain: lat [{s}, {n}], lon [{w}, {e_}] — "
+                f"{len(keys)} scene(s) inside it")
+    if not keys:
+        logger.warning("no granule intersects the processing domain on this date")
+    return keys
+
+
 def download_from_s3(output_dir: Path, date_str: str,
                      skip: set[str] | None = None,
-                     orbit: str | None = None) -> set[str]:
+                     orbit: str | None = None,
+                     whole_orbit: bool = False) -> set[str]:
     """Sync data from S3 bucket for a specific date.
     Returns set of local subdirs that were populated."""
     bucket = os.environ.get("S3_BUCKET", "ECOSTRESS")
@@ -1525,18 +1565,19 @@ def download_from_s3(output_dir: Path, date_str: str,
         return set()
 
     orbit_msg = f", orbit: {orbit}" if orbit else ""
-    print(f"\n{'='*60}")
-    print(f"  S3 sync from s3://{bucket}/ (date: {date_str}{orbit_msg})")
-    print(f"{'='*60}")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"  S3 sync from s3://{bucket}/ (date: {date_str}{orbit_msg})")
+    logger.info(f"{'='*60}")
 
     skip = skip or set()
     synced = set()
     rad_orbits: set[str] = set()
     orbit_bbox = _get_orbit_bbox(output_dir, orbit=orbit, date=date_str)
+    domain_keys = _s3_domain_scene_keys(skip, orbit, whole_orbit)
 
     for s3_prefix, local_subdir in _get_s3_prefix_map().items():
         if local_subdir in skip:
-            print(f"\n  [skip] {s3_prefix} (--skip flag)")
+            logger.info(f"\n  [skip] {s3_prefix} (--skip flag)")
             continue
 
         dest_dir = output_dir / local_subdir
@@ -1545,7 +1586,7 @@ def download_from_s3(output_dir: Path, date_str: str,
         if local_subdir == "glc30" and orbit_bbox is None:
             # Without a footprint the tile filter cannot run, and the global
             # GLC30 set is hundreds of GB. Skip rather than fetch all of it.
-            print(f"  [skip] {s3_prefix} (footprint unknown)")
+            logger.info(f"  [skip] {s3_prefix} (footprint unknown)")
             continue
 
         is_global = local_subdir in _S3_GLOBAL_LOCAL_KEYS
@@ -1565,7 +1606,7 @@ def download_from_s3(output_dir: Path, date_str: str,
             extra = f" (monthly: {date_str[:7]})"
         elif needs_rad_match:
             extra = f" (filtered to {len(rad_orbits)} RAD orbit(s))"
-        print(f"\n  --- {s3_prefix} → {local_subdir}/{extra} ---")
+        logger.info(f"\n  --- {s3_prefix} → {local_subdir}/{extra} ---")
 
         try:
             paginator = s3.get_paginator("list_objects_v2")
@@ -1573,6 +1614,7 @@ def download_from_s3(output_dir: Path, date_str: str,
 
             # Collect candidates (for monthly datasets, we pick best RT after)
             candidates = []
+            outside = 0
             for page in pages:
                 for obj in page.get("Contents", []):
                     key = obj["Key"]
@@ -1597,11 +1639,19 @@ def download_from_s3(output_dir: Path, date_str: str,
                         continue
                     if orbit and local_subdir in ("rad", "geo", "cloud") and not _s3_orbit_matches(fname, orbit):
                         continue
+                    if domain_keys is not None and local_subdir in ("rad", "geo", "cloud"):
+                        if _scene_key(fname) not in domain_keys:
+                            outside += 1
+                            continue
                     if needs_rad_match:
                         fnum = _extract_orbit_number(fname)
                         if fnum and fnum not in rad_orbits:
                             continue
                     candidates.append((fname, key, obj))
+
+            if outside:
+                logger.info(f"  {outside} granule(s) outside the processing "
+                            "domain — not downloaded")
 
             # For monthly datasets (FCOVER/LAI 10-day composites): take the
             # best RT of every composite the date needs, which is more than one.
@@ -1620,13 +1670,13 @@ def download_from_s3(output_dir: Path, date_str: str,
                         # consumers select by name, so a stand-in only moves the
                         # failure further from its cause. The CDSE step that
                         # follows can still fill the gap.
-                        print(f"  [warn] composite {want} not on S3")
+                        logger.warning(f"composite {want} not on S3")
                         continue
                     best_item = max(by_date[want],
                                     key=lambda item: _clms_rt_score(item[0]))
                     score = _clms_rt_score(best_item[0])
                     rt_label = f"RT{score}" if score < 100 else "final"
-                    print(f"  Best for {want}: {best_item[0]} ({rt_label})")
+                    logger.info(f"  Best for {want}: {best_item[0]} ({rt_label})")
                     selected.append(best_item)
                 candidates = selected
 
@@ -1635,7 +1685,7 @@ def download_from_s3(output_dir: Path, date_str: str,
                 dest = dest_dir / fname
                 if dest.exists() and dest.stat().st_size == obj["Size"]:
                     count += 1
-                    print(f"  [{count}] {fname} (exists, skip)")
+                    logger.info(f"  [{count}] {fname} (exists, skip)")
                     if local_subdir == "rad":
                         onum = _extract_orbit_number(fname)
                         if onum:
@@ -1643,18 +1693,18 @@ def download_from_s3(output_dir: Path, date_str: str,
                     continue
                 s3.download_file(bucket, key, str(dest))
                 count += 1
-                print(f"  [{count}] {fname} ({obj['Size'] / 1e6:.1f} MB)")
+                logger.info(f"  [{count}] {fname} ({obj['Size'] / 1e6:.1f} MB)")
                 if local_subdir == "rad":
                     onum = _extract_orbit_number(fname)
                     if onum:
                         rad_orbits.add(onum)
             if count == 0:
-                print(f"  [skip] no files found on S3")
+                logger.info(f"  [skip] no files found on S3")
             else:
-                print(f"  [ok] {count} file(s) synced")
+                logger.info(f"  [ok] {count} file(s) synced")
                 synced.add(local_subdir)
         except Exception as e:
-            print(f"  [warn] S3 sync failed for {s3_prefix}: {e}")
+            logger.warning(f"S3 sync failed for {s3_prefix}: {e}")
 
     return synced
 
@@ -1664,10 +1714,10 @@ def download_from_s3(output_dir: Path, date_str: str,
 def print_manual_data(par_ok: bool) -> None:
     if par_ok:
         return
-    print("\n" + "="*60)
-    print("  MANUAL STEP REQUIRED")
-    print("="*60)
-    print("""
+    logger.info("\n" + "="*60)
+    logger.info("  MANUAL STEP REQUIRED")
+    logger.info("="*60)
+    logger.info("""
 PAR half-hourly (PARin*.nc files) could not be downloaded automatically.
 Order manually from CM SAF SAFIRA: https://wui.cmsaf.eu
   Select SARAH-3, product "PAR instantaneous". Once processed,
@@ -1682,6 +1732,11 @@ Note: TES and STIC run without PAR — it is only needed for GPP.
 # ── Main ──────────────────────────────────────────────────────────────────
 
 def main():
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     parser = argparse.ArgumentParser(
         description="Download sample data for orbit 36798_018_20250101T165942.",
     )
@@ -1753,7 +1808,8 @@ def main():
         if args.skip_par:
             skip_s3.add("parh")
         s3_synced = download_from_s3(output_dir, date_str=DATE, skip=skip_s3,
-                                     orbit=args.orbit)
+                                     orbit=args.orbit,
+                                     whole_orbit=args.whole_orbit)
 
     # ── Normal downloads (skip what S3 already provided) ─────────────
     errors = []
@@ -1768,10 +1824,10 @@ def main():
                                                whole_orbit=args.whole_orbit)
             dl_failed += failed
             if failed:
-                print(f"\n[WARN] {failed}/{total} ECOSTRESS files failed")
+                logger.warning(f"{failed}/{total} ECOSTRESS files failed")
             download_oco2(session, output_dir)
         except Exception as e:
-            print(f"\n[ERROR] ECOSTRESS/OCO2 download failed: {e}")
+            logger.error(f"ECOSTRESS/OCO2 download failed: {e}")
             errors.append("ecostress")
 
     if "mota" not in s3_synced:
@@ -1780,14 +1836,14 @@ def main():
                 session = _earthdata_session()
             download_mota(session, output_dir)
         except Exception as e:
-            print(f"\n[ERROR] MOTA download failed: {e}")
+            logger.error(f"MOTA download failed: {e}")
             errors.append("mota")
 
     if not args.skip_era5 and "era5" not in s3_synced:
         try:
             download_era5(output_dir, orbit=args.orbit)
         except Exception as e:
-            print(f"\n[ERROR] ERA5 download failed: {e}")
+            logger.error(f"ERA5 download failed: {e}")
             errors.append("era5")
 
     # Gated on what is actually missing, not on whether the S3 sync ran: the
@@ -1797,7 +1853,7 @@ def main():
         try:
             download_fcover_lai(output_dir)
         except Exception as e:
-            print(f"\n[ERROR] FCOVER/LAI download failed: {e}")
+            logger.error(f"FCOVER/LAI download failed: {e}")
             errors.append("clms")
 
     par_ok = True
@@ -1805,7 +1861,7 @@ def main():
         try:
             par_ok = download_par(output_dir)
         except Exception as e:
-            print(f"\n[ERROR] PAR download failed: {e}")
+            logger.error(f"PAR download failed: {e}")
             errors.append("par")
             par_ok = False
     elif "parh" in s3_synced:
@@ -1813,38 +1869,38 @@ def main():
         # The bucket itself stores PARin unpacked, but a file that arrived by
         # some other route can still be sitting there, and it would fail every
         # granule with "NetCDF: Unknown file format" rather than fail here.
-        print("\n--- PAR half-hourly (from S3) ---")
+        logger.info("\n--- PAR half-hourly (from S3) ---")
         repair_par_archives(output_dir)
         ymd = DATE.replace("-", "")
         par_ok = any(_is_valid_par_netcdf(f) for f in
                      (output_dir / "parh").glob(f"{PAR_PRODUCT_PREFIX}{ymd}*.nc"))
         if not par_ok:
-            print(f"  [warn] no readable {PAR_PRODUCT_PREFIX} NetCDF for {DATE}")
+            logger.warning(f"no readable {PAR_PRODUCT_PREFIX} NetCDF for {DATE}")
 
     if not args.skip_lulc and "lulc" not in s3_synced:
         try:
             download_lulc(output_dir)
         except Exception as e:
-            print(f"\n[ERROR] LULC download failed: {e}")
+            logger.error(f"LULC download failed: {e}")
             errors.append("lulc")
 
     if not args.skip_glc30 and "glc30" not in s3_synced:
         try:
             download_glc30(output_dir, orbit=args.orbit)
         except Exception as e:
-            print(f"\n[ERROR] GLC30 download failed: {e}")
+            logger.error(f"GLC30 download failed: {e}")
             errors.append("glc30")
 
     if errors:
-        print(f"\n[WARN] Some downloads failed: {', '.join(errors)}")
+        logger.warning(f"Some downloads failed: {', '.join(errors)}")
     if dl_failed:
-        print(f"[WARN] {dl_failed} file(s) failed after retries")
+        logger.warning(f"{dl_failed} file(s) failed after retries")
 
     print_manual_data(par_ok)
 
-    print("="*60)
-    print(f"  Done. Data root: {output_dir.resolve()}")
-    print("="*60)
+    logger.info("="*60)
+    logger.info(f"  Done. Data root: {output_dir.resolve()}")
+    logger.info("="*60)
 
     if dl_failed or errors:
         sys.exit(2)
