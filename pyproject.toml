@@ -25,10 +25,14 @@ dependencies = [
     "matplotlib",
     "shapely",
     "geopandas",
+    # --- COG ---
+    "pyresample",
+    "h5netcdf",
     # --- pipeline orchestration ---
     "python-dotenv",
+    "requests",
 ]
 
 [project.optional-dependencies]
 stic = ["GDAL"]
-download = ["cdsapi"]
+download = ["cdsapi", "eumdac", "boto3"]
