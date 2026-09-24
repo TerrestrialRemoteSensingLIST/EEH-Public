@@ -60,3 +60,4 @@ rttov*.tar.gz
 
 # --- Claude Code local session state ---
 .claude/
+CLAUDE.md
