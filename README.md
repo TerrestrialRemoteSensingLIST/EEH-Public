@@ -433,6 +433,20 @@ requested over that box and the granule filter follows it:
 EEH2_DOMAIN="40,60,-10,150" docker compose run eeh-pipeline --start-date 2026-08-01 --end-date 2026-08-01
 ```
 
+ERA5 filenames record the timestamp only, never the box the file was requested
+for, so a `data/era5/` filled for one domain is reused as-is by a run over
+another. Change `EEH2_DOMAIN` without clearing those files and every pixel
+outside the old box takes the value of the nearest grid edge. Both
+`ReadERA5Data.py` warn when a granule exceeds the grid they opened:
+
+```
+granule lat [47.65, 52.23] lon [4.08, 10.94] exceeds the ERA5 grid
+lat [49.00, 52.00] lon [2.00, 7.00] — outside pixels use edge values
+```
+
+Delete `data/era5/` when changing the domain, or download to a separate
+`--output-dir`.
+
 `tools/download_sample.py --whole-orbit` fetches every granule of an orbit
 regardless of the domain. The extra granules still cannot be processed unless
 `EEH2_DOMAIN` covers them, so this is mainly useful for archiving.
