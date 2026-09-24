@@ -23,6 +23,7 @@ from __future__ import annotations
 
 import argparse
 import glob
+import logging
 import os
 import re
 import subprocess
@@ -32,6 +33,8 @@ from datetime import datetime, timedelta
 from pathlib import Path
 
 from dotenv import dotenv_values
+
+logger = logging.getLogger(__name__)
 
 # Resolved from this file, not the cwd, so the pipeline can be launched from
 # anywhere (the Docker entrypoint happens to run in /app, but callers may not).
@@ -53,16 +56,16 @@ def _optional(env: dict, key: str) -> list[str] | None:
 
 
 def _run_step(name: str, script: str, argv: list[str]) -> None:
-    print(f"\n{'='*60}")
-    print(f"  EEH2 Pipeline — {name}")
-    print(f"{'='*60}\n")
+    logger.info(f"\n{'='*60}")
+    logger.info(f"  EEH2 Pipeline — {name}")
+    logger.info(f"{'='*60}\n")
     cmd = [sys.executable, str(REPO_ROOT / script)] + argv
-    print(f"  Command: {' '.join(cmd)}\n")
+    logger.info(f"  Command: {' '.join(cmd)}\n")
     result = subprocess.run(cmd)
     if result.returncode != 0:
-        print(f"\n[ERROR] {name} exited with code {result.returncode}")
+        logger.error(f"{name} exited with code {result.returncode}")
         sys.exit(result.returncode)
-    print(f"\n[OK] {name} finished (exit code 0).\n")
+    logger.info(f"\n[OK] {name} finished (exit code 0).\n")
 
 
 def run_tes(env: dict, input_files: list[str] | None = None) -> None:
@@ -161,12 +164,12 @@ def run_cog(env: dict, input_files: list[str] | None = None,
     for product, src_dir, out_dir, cld_dir, force_product in conversions:
         h5_files = sorted(glob.glob(os.path.join(src_dir, pattern)))
         if not h5_files:
-            print(f"[COG] No {product} H5 files found in {src_dir}")
+            logger.info(f"[COG] No {product} H5 files found in {src_dir}")
             continue
 
-        print(f"\n{'='*60}")
-        print(f"  EEH2 Pipeline — COG conversion: {product} ({len(h5_files)} files)")
-        print(f"{'='*60}\n")
+        logger.info(f"\n{'='*60}")
+        logger.info(f"  EEH2 Pipeline — COG conversion: {product} ({len(h5_files)} files)")
+        logger.info(f"{'='*60}\n")
 
         convert_batch(
             h5_files, geo_dir, out_dir,
@@ -176,7 +179,7 @@ def run_cog(env: dict, input_files: list[str] | None = None,
             workers=min(4, len(h5_files)),
         )
 
-    print(f"\n[OK] COG conversion completed.\n")
+    logger.info(f"\n[OK] COG conversion completed.\n")
 
 
 CMR_URL = "https://cmr.earthdata.nasa.gov/search/granules.json"
@@ -220,14 +223,19 @@ def _list_orbits(start_date: str, end_date: str) -> None:
             m = re.search(r'_(\d{5})_\d{3}_', e.get("title", ""))
             if m:
                 orbits[m.group(1)] = orbits.get(m.group(1), 0) + 1
-        print(f"\n  {day_str}: {len(entries)} granules, {len(orbits)} orbits")
+        logger.info(f"\n  {day_str}: {len(entries)} granules, {len(orbits)} orbits")
         for orb in sorted(orbits):
-            print(f"    {orb}  ({orbits[orb]} scenes)")
+            logger.info(f"    {orb}  ({orbits[orb]} scenes)")
         dt_cur += timedelta(days=1)
-    print()
+    logger.info("")
 
 
 def main(argv=None):
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s [%(levelname)s] %(name)s — %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
     parser = argparse.ArgumentParser(
         description="Run the EEH2 processing pipeline (TES → STIC → GPP).",
     )
@@ -303,14 +311,14 @@ def main(argv=None):
                   "--env", args.env]
         if args.no_s3:
             dl_cmd.append("--no-s3")
-        print("="*60)
-        print("  EEH2 Pipeline — Downloading sample data")
-        print("="*60 + "\n")
+        logger.info("="*60)
+        logger.info("  EEH2 Pipeline — Downloading sample data")
+        logger.info("="*60 + "\n")
         result = subprocess.run(dl_cmd)
         if result.returncode == 2:
-            print("\n[WARN] Some downloads failed after retries — continuing with available data")
+            logger.warning("Some downloads failed after retries — continuing with available data")
         elif result.returncode != 0:
-            print(f"\n[ERROR] download exited with code {result.returncode}")
+            logger.error(f"download exited with code {result.returncode}")
             sys.exit(result.returncode)
 
     os.makedirs(env.get("OUTPUT_TES", ""), exist_ok=True)
@@ -325,7 +333,7 @@ def main(argv=None):
     if not rad_files and args.orbit and not args.start_date:
         rad_files = sorted(glob.glob(os.path.join(rad_dir, f"*{args.orbit}*")))
         if not rad_files:
-            print(f"[INFO] No RAD files for orbit {args.orbit} in {rad_dir}, downloading ECOSTRESS data...")
+            logger.info(f"No RAD files for orbit {args.orbit} in {rad_dir}, downloading ECOSTRESS data...")
             dl_eco = [sys.executable, DOWNLOAD_SCRIPT,
                       "--orbit", args.orbit,
                       "--skip-era5", "--skip-clms", "--skip-lulc",
@@ -336,12 +344,12 @@ def main(argv=None):
                 dl_eco.append("--no-s3")
             result = subprocess.run(dl_eco)
             if result.returncode == 2:
-                print("[WARN] Some ECOSTRESS downloads failed (retries exhausted)")
+                logger.warning("Some ECOSTRESS downloads failed (retries exhausted)")
             rad_files = sorted(glob.glob(os.path.join(rad_dir, f"*{args.orbit}*")))
             if not rad_files:
-                print(f"[ERROR] Still no RAD files for orbit {args.orbit} after download.")
+                logger.error(f"Still no RAD files for orbit {args.orbit} after download.")
                 sys.exit(1)
-        print(f"[INFO] Processing orbit {args.orbit}: {len(rad_files)} RAD file(s)")
+        logger.info(f"Processing orbit {args.orbit}: {len(rad_files)} RAD file(s)")
 
     # ── Date range: download all orbits for each date ───────────────
     if args.start_date:
@@ -350,9 +358,9 @@ def main(argv=None):
         dt_cur = dt_start
         while dt_cur <= dt_end:
             day_str = dt_cur.strftime("%Y-%m-%d")
-            print(f"\n{'='*60}")
-            print(f"  EEH2 Pipeline — Downloading data for {day_str}")
-            print(f"{'='*60}\n")
+            logger.info(f"\n{'='*60}")
+            logger.info(f"  EEH2 Pipeline — Downloading data for {day_str}")
+            logger.info(f"{'='*60}\n")
             dl_cmd = [sys.executable, DOWNLOAD_SCRIPT,
                       "--date", day_str,
                       "--output-dir", output_root,
@@ -363,16 +371,31 @@ def main(argv=None):
                 dl_cmd.append("--no-s3")
             result = subprocess.run(dl_cmd)
             if result.returncode == 2:
-                print(f"[WARN] Some downloads failed for {day_str} (retries exhausted)")
+                logger.warning(f"Some downloads failed for {day_str} (retries exhausted)")
             dt_cur += timedelta(days=1)
         if args.orbit:
             rad_files = sorted(glob.glob(os.path.join(rad_dir, f"*{args.orbit}*")))
             if not rad_files:
-                print(f"[ERROR] No RAD files for orbit {args.orbit} after download.")
+                logger.error(f"No RAD files for orbit {args.orbit} after download.")
                 sys.exit(1)
-            print(f"[INFO] Processing orbit {args.orbit}: {len(rad_files)} RAD file(s)")
+            logger.info(f"Processing orbit {args.orbit}: {len(rad_files)} RAD file(s)")
         else:
-            rad_files = None
+            # Scope to the requested range: the RAD directory usually holds other
+            # dates, and leaving this None widens dates_seen to the whole disk,
+            # which drags unrelated dates through the ancillary and skip checks.
+            wanted = {(dt_start + timedelta(days=i)).strftime("%Y%m%d")
+                      for i in range((dt_end - dt_start).days + 1)}
+            rad_files = []
+            for f in sorted(glob.glob(os.path.join(rad_dir, "*.h5"))):
+                m = re.search(r"_(\d{8})T", os.path.basename(f))
+                if m and m.group(1) in wanted:
+                    rad_files.append(f)
+            if not rad_files:
+                logger.error(f"No RAD files for {args.start_date}..{args.end_date} "
+                      "after download.")
+                sys.exit(1)
+            logger.info(f"Processing {args.start_date}..{args.end_date}: "
+                  f"{len(rad_files)} RAD file(s)")
 
     # Ensure ancillary data is present for each date found in RAD files
     source_files = rad_files or glob.glob(os.path.join(rad_dir, "*.h5"))
@@ -382,7 +405,7 @@ def main(argv=None):
         if m:
             dates_seen.add(f"{m.group(1)}-{m.group(2)}-{m.group(3)}")
     for orbit_date in sorted(dates_seen):
-        print(f"[INFO] Ensuring ancillary data for {orbit_date}...")
+        logger.info(f"Ensuring ancillary data for {orbit_date}...")
         dl_anc = [sys.executable, DOWNLOAD_SCRIPT,
                   "--date", orbit_date,
                   "--skip-ecostress",
@@ -395,7 +418,7 @@ def main(argv=None):
             dl_anc.append("--no-s3")
         result = subprocess.run(dl_anc)
         if result.returncode == 2:
-            print(f"[WARN] Some ancillary downloads failed for {orbit_date} "
+            logger.warning(f"Some ancillary downloads failed for {orbit_date} "
                   "(retries exhausted)")
 
     steps = {
@@ -449,10 +472,10 @@ def main(argv=None):
         """
         written = _outputs_written_since(step_name, since)
         if written:
-            print(f"[INFO] {step_name.upper()} wrote {len(written)} output file(s).")
+            logger.info(f"{step_name.upper()} wrote {len(written)} output file(s).")
         else:
             empty_steps.append(step_name.upper())
-            print(f"[WARN] {step_name.upper()} exited cleanly but wrote no output: "
+            logger.warning(f"{step_name.upper()} exited cleanly but wrote no output: "
                   "every granule was skipped or failed. See the error log in "
                   f"{step_output[step_name]}")
 
@@ -478,12 +501,12 @@ def main(argv=None):
             fn, _ = steps[args.step]
             existing = _step_has_output(args.step)
             if existing and not args.force:
-                print(f"[SKIP] {args.step.upper()} — {len(existing)} output file(s) already exist (use --force to re-run)")
+                logger.info(f"[SKIP] {args.step.upper()} — {len(existing)} output file(s) already exist (use --force to re-run)")
             else:
                 upstream = {"stic": "tes", "gpp": "stic"}.get(args.step)
                 step_files = _step_has_output(upstream) if upstream else rad_files
                 if step_files is not None and not step_files:
-                    print(f"[SKIP] {args.step.upper()} — no matching input for this "
+                    logger.info(f"[SKIP] {args.step.upper()} — no matching input for this "
                           "selection, nothing to process")
                 else:
                     started = time.time()
@@ -499,7 +522,7 @@ def main(argv=None):
 
         for name, (fn, env_key) in steps.items():
             if not _env_bool(env.get(env_key, "true")):
-                print(f"[SKIP] {name.upper()} (disabled in {env_path})")
+                logger.info(f"[SKIP] {name.upper()} (disabled in {env_path})")
                 continue
 
             step_files = {"tes": tes_files, "stic": stic_files,
@@ -507,13 +530,13 @@ def main(argv=None):
             if step_files is not None and not step_files:
                 previous = {"tes": "the selection", "stic": "TES",
                             "gpp": "STIC"}[name]
-                print(f"[SKIP] {name.upper()} — {previous} produced no matching "
+                logger.info(f"[SKIP] {name.upper()} — {previous} produced no matching "
                       "input for this selection, nothing to process")
                 continue
 
             existing = _step_has_output(name)
             if existing and not args.force:
-                print(f"[SKIP] {name.upper()} — {len(existing)} output file(s) already exist (use --force to re-run)")
+                logger.info(f"[SKIP] {name.upper()} — {len(existing)} output file(s) already exist (use --force to re-run)")
                 if name == "tes":
                     stic_files = existing
                 elif name == "stic":
@@ -534,13 +557,13 @@ def main(argv=None):
     if args.cog:
         run_cog(env, orbit=args.orbit, force=args.force)
 
-    print("\n" + "="*60)
+    logger.info("\n" + "="*60)
     if empty_steps:
-        print("  EEH2 Pipeline — finished, but "
+        logger.info("  EEH2 Pipeline — finished, but "
               f"{', '.join(empty_steps)} produced no output.")
     else:
-        print("  EEH2 Pipeline — All steps completed.")
-    print("="*60)
+        logger.info("  EEH2 Pipeline — All steps completed.")
+    logger.info("="*60)
 
 
 if __name__ == "__main__":
