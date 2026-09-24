@@ -249,6 +249,94 @@ docker compose run eeh-pipeline --step gpp
 
 > `--start-date`/`--end-date` and `--input-files` are mutually exclusive. `--orbit` can be combined with `--start-date`/`--end-date` to filter by orbit number within the date range.
 
+> A named selection is followed through all three steps by `{orbit}_{scene}`, so
+> `--input-files` on one granule runs STIC and GPP on that granule only.
+> Narrowing on the date alone used to pull in every other granule of the same
+> date, because that is what the products of a step have in common. A path that
+> does not exist is refused before anything starts, rather than counted as one
+> failed granule on the way to the completion banner.
+
+**Exit codes**, for callers that script the pipeline:
+
+| Code | Meaning |
+|------|---------|
+| `0` | Every enabled step produced output |
+| `1` | A step ran, exited cleanly, and wrote nothing — every granule was skipped or failed |
+| `2` | Bad invocation (unknown flag, missing input file) |
+| other | Propagated verbatim from the step that failed |
+
+Code `1` exists because TES, STIC and GPP each catch their per-granule failures
+so one bad granule does not abandon the rest — which means they exit 0 even when
+every granule failed. The closing banner has always said so; the exit code now
+says so too.
+
+## Verifying the installation
+
+Two checks, one cheap and one conclusive.
+
+### Environment check
+
+```bash
+docker compose run selftest
+```
+
+Seconds, no data and no credentials needed. It reports the Python version, every
+third-party module the three steps import, the RTTOV installation with its
+ECOSTRESS coefficient file and its `pyrttov` wrapper, the GPP look-up table, the
+data directories, whether the output mounts are writable, and which credentials
+are configured — by name only, never their values. It exits non-zero on the
+first missing piece, so it is usable in CI.
+
+A read-only output mount is worth checking this way: otherwise it only surfaces
+at the end of a run, after hours of processing.
+
+### Reference case
+
+The environment check cannot tell whether the installation *computes* the right
+thing. For that, run the pipeline on the reference granule and compare against
+the shipped statistics:
+
+```bash
+docker compose run download --date 2025-01-01 --orbit 36798
+docker compose run eeh-pipeline --input-files /data/rad/ECOv002_L1B_RAD_36798_016_20250101T165758_0713_02.h5
+docker compose run selftest --products
+```
+
+The reference case is orbit **36798, scene 016 of 2025-01-01**, processed over
+the default domain. `tools/reference/reference_36798_20250101.json` holds, for
+each dataset of the three products, its shape, its dtype, the fraction of valid
+pixels and the minimum, maximum and mean over those pixels. Fill values
+(`-9999` for the float datasets, `0` for the integer ones) are excluded, so the
+statistics describe retrieved pixels rather than the swath's empty corners.
+
+This granule reaches 36.96° S while the default domain stops at 35° S, so the run
+logs one `exceeds the ERA5 grid … outside pixels use edge values` warning per
+step. That is expected here and part of what the reference statistics describe —
+not a sign of a failed installation.
+
+```
+LST      PASS   mean 14798.3569, 99.1% valid
+ETD      PASS   mean 1.3311, 31.2% valid
+GPPd     PASS   mean 5.6875, 9.1% valid
+```
+
+A deviation is reported with both values and the tolerance it exceeded:
+
+```
+[FAIL] ETD    mean 1.4102, expected 1.3311 (tolerance 1e-03 relative)
+```
+
+Defaults are `1e-3` relative on minimum, maximum and mean, and `5e-3` absolute
+on the fraction of valid pixels; both are flags
+(`--relative-tolerance`, `--valid-fraction-tolerance`). Tolerances rather than
+exact equality, because RTTOV and the BLAS the container links against are free
+to reassociate floating-point work; a different BLAS build shifts the last
+digits without changing the retrieval.
+
+To adopt a new reference after a deliberate algorithm change, run
+`tools/selftest.py --products --write-reference` and commit the regenerated
+file, so the delivered code and its reference always move together.
+
 ## Local development (without Docker)
 
 ### Prerequisites

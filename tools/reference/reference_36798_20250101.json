@@ -1,0 +1,249 @@
+{
+  "description": "Reference case for verifying an EEH2 installation. Statistics of the three products the pipeline writes for one ECOSTRESS granule, computed over valid pixels only (fill -9999 for floats, 0 for integers). Regenerate with tools/selftest.py --products --write-reference.",
+  "case": {
+    "date": "2025-01-01",
+    "orbit": "36798",
+    "scene": "016",
+    "rad_file": "ECOv002_L1B_RAD_36798_016_20250101T165758_0713_02.h5",
+    "domain": "default (75,-20,-35,60)"
+  },
+  "products": {
+    "tes/EEH2TES_L2_LSTE_36798_016_20250101T165758_0000_00.h5": {
+      "BBE": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "uint8",
+        "valid_fraction": 0.990915,
+        "minimum": 20.0,
+        "maximum": 248.0,
+        "mean": 231.877533
+      },
+      "Emis2": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "uint8",
+        "valid_fraction": 0.990915,
+        "minimum": 14.0,
+        "maximum": 249.0,
+        "mean": 225.149664
+      },
+      "Emis4": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "uint8",
+        "valid_fraction": 0.990915,
+        "minimum": 7.0,
+        "maximum": 249.0,
+        "mean": 241.081161
+      },
+      "Emis5": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "uint8",
+        "valid_fraction": 0.990915,
+        "minimum": 1.0,
+        "maximum": 255.0,
+        "mean": 233.750218
+      },
+      "LST": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "uint16",
+        "valid_fraction": 0.990915,
+        "minimum": 12596.0,
+        "maximum": 19946.0,
+        "mean": 14798.3569
+      },
+      "qa": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "int16",
+        "valid_fraction": 1.0,
+        "minimum": -4.0,
+        "maximum": 1.0,
+        "mean": 0.954579782
+      }
+    },
+    "stic/EEH2STIC_L3_ET_36798_016_20250101T165758_0000_00.h5": {
+      "ETD": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 1.92318993e-07,
+        "maximum": 5.90105391,
+        "mean": 1.33110068
+      },
+      "G": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 0.264919817,
+        "maximum": 36.6372223,
+        "mean": 10.4172332
+      },
+      "H": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 0.85678041,
+        "maximum": 156.301178,
+        "mean": 30.6840314
+      },
+      "LE": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 4.6832949e-05,
+        "maximum": 155.230606,
+        "mean": 41.5185066
+      },
+      "Mrz": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 2.19781811e-08,
+        "maximum": 0.5230968,
+        "mean": 0.12744374
+      },
+      "Ms": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 1.28152928e-08,
+        "maximum": 0.501401067,
+        "mean": 0.254287476
+      },
+      "Rn": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 1.26539028,
+        "maximum": 174.240311,
+        "mean": 82.6079268
+      },
+      "gah": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 5.41484696e-05,
+        "maximum": 0.0537951887,
+        "mean": 0.00390090822
+      },
+      "gsc": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.311624,
+        "minimum": 2.15043938e-09,
+        "maximum": 0.0139306262,
+        "mean": 0.0021905615
+      }
+    },
+    "gpp/EEH2STIC_L3_GPP_36798_016_20250101T165758_0000_00.h5": {
+      "GPP_LUE": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.09142,
+        "minimum": 0.0,
+        "maximum": 5.47242853e-05,
+        "mean": 1.21309864e-05
+      },
+      "GPP_gs": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.09142,
+        "minimum": 2.35302196e-06,
+        "maximum": 0.000161886652,
+        "mean": 5.56114112e-05
+      },
+      "GPPd": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.09142,
+        "minimum": 0.0,
+        "maximum": 21.4098644,
+        "mean": 5.68749632
+      },
+      "GPPi": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.09142,
+        "minimum": 0.0,
+        "maximum": 5.47242853e-05,
+        "mean": 1.22431259e-05
+      },
+      "LUCC": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "int16",
+        "valid_fraction": 0.282988,
+        "minimum": 2.0,
+        "maximum": 18.0,
+        "mean": 8.77659267
+      },
+      "WUEd": {
+        "shape": [
+          5632,
+          5400
+        ],
+        "dtype": "float32",
+        "valid_fraction": 0.09142,
+        "minimum": 0.0,
+        "maximum": 1219.61792,
+        "mean": 9.60489079
+      }
+    }
+  }
+}

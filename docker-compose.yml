@@ -47,6 +47,37 @@ services:
       - S3_SECRET_KEY=${S3_SECRET_KEY}
       - S3_BUCKET=${S3_BUCKET:-ECOSTRESS}
 
+  selftest:
+    build: .
+    image: eeh2:latest
+    entrypoint: ["python", "tools/selftest.py"]
+    volumes:
+      - ${DATA_ROOT:-./data}:/data
+      - ${OUTPUT_ROOT:-./output}:/output
+    environment:
+      - RTTOV_INSTALLDIR=/opt/rttov123
+      - LUT_FILE=/app/GPP/LookUpTable_LUE_HH_gsFULL-globe.csv
+      - INPUT_RAD_DIR=/data/rad
+      - GEO_DIR=/data/geo
+      - CLOUD_DIR=/data/cloud
+      - ERA5_DIR=/data/era5
+      - FCOVER_DIR=/data/fcover
+      - ALBEDO_MOTA_DIR=/data/mota
+      - LULC_DIR=/data/lulc
+      - PARH_DIR=/data/parh
+      - LAI_DIR=/data/lai
+      - OCO2_DIR=/data/oco2
+      - GLC30_DIR=/data/glc30
+      - OUTPUT_TES=/output/tes
+      - OUTPUT_STIC=/output/stic
+      - OUTPUT_GPP=/output/gpp
+      # Reported as set or unset, never printed.
+      - EARTHDATA_USERNAME=${EARTHDATA_USERNAME}
+      - CDS_API_KEY=${CDS_API_KEY}
+      - CDSE_USERNAME=${CDSE_USERNAME}
+      - EUMETSAT_CONSUMER_KEY=${EUMETSAT_CONSUMER_KEY}
+      - S3_ENDPOINT_URL=${S3_ENDPOINT_URL}
+
   download:
     build: .
     image: eeh2:latest

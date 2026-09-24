@@ -41,6 +41,10 @@ logger = logging.getLogger(__name__)
 REPO_ROOT = Path(__file__).resolve().parent
 DOWNLOAD_SCRIPT = str(REPO_ROOT / "tools" / "download_sample.py")
 
+# Orbit and scene, anchored on the acquisition timestamp that follows them, in
+# both RAD granule names and the products derived from them.
+GRANULE_KEY = re.compile(r"_(\d+)_(\d{3})_\d{8}T")
+
 
 def _env_bool(val: str | None) -> bool:
     if val is None:
@@ -330,6 +334,14 @@ def main(argv=None):
     output_root = str(Path(rad_dir).parent)
     rad_files = args.input_files
 
+    if rad_files:
+        # A path that does not exist used to be reported by TES as one failed
+        # granule, after which the downstream steps fell back to the whole date
+        # and the run ended on its completion banner.
+        missing = [f for f in rad_files if not os.path.isfile(f)]
+        if missing:
+            parser.error("--input-files: no such file: " + ", ".join(missing))
+
     if not rad_files and args.orbit and not args.start_date:
         rad_files = sorted(glob.glob(os.path.join(rad_dir, f"*{args.orbit}*")))
         if not rad_files:
@@ -434,9 +446,23 @@ def main(argv=None):
         "gpp":  env.get("OUTPUT_GPP",  "./data/output/gpp"),
     }
 
+    # The {orbit}_{scene} pair a product inherits from the RAD granule it came
+    # from. Narrowing on the date alone was not enough: one named input file
+    # selects its date, and every other granule of that date was then swept into
+    # STIC and GPP as if it had been asked for.
+    selected_granules = set()
+    for f in rad_files or []:
+        m = GRANULE_KEY.search(Path(f).name)
+        if m:
+            selected_granules.add(m.group(1, 2))
+
     def _matches_selection(name: str) -> bool:
         if args.orbit and f"_{args.orbit}_" not in name:
             return False
+        if selected_granules:
+            m = GRANULE_KEY.search(name)
+            if not m or m.group(1, 2) not in selected_granules:
+                return False
         if dates_seen:
             m = re.search(r"_(\d{4})(\d{2})(\d{2})T", name)
             if not m or f"{m.group(1)}-{m.group(2)}-{m.group(3)}" not in dates_seen:
@@ -489,7 +515,7 @@ def main(argv=None):
         directory and silently reprocess unrelated orbits and dates.
         """
         out_dir = step_output[step_name]
-        if not args.orbit and not dates_seen:
+        if not args.orbit and not dates_seen and not selected_granules:
             return None
         files = sorted(glob.glob(os.path.join(out_dir, "*.h5")))
         return [f for f in files if _matches_selection(os.path.basename(f))]
@@ -565,6 +591,10 @@ def main(argv=None):
         logger.info("  EEH2 Pipeline — All steps completed.")
     logger.info("="*60)
 
+    # A step that catches every per-granule failure still exits 0, so only this
+    # distinguishes "processed nothing" from success for a calling script.
+    return 1 if empty_steps else 0
+
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())
