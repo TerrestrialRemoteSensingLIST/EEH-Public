@@ -1830,6 +1830,17 @@ def main():
             logger.error(f"ECOSTRESS/OCO2 download failed: {e}")
             errors.append("ecostress")
 
+    # Ancillaries only serve RAD granules; an orbit outside the domain used to
+    # pull MODIS, ERA5, CLMS and PAR for a run that then stopped on "no RAD".
+    if not args.skip_ecostress:
+        ymd = DATE.replace("-", "")
+        pattern = f"*_{args.orbit}_*_{ymd}T*.h5" if args.orbit else f"*_{ymd}T*.h5"
+        if not list((output_dir / "rad").glob(pattern)):
+            logger.error(f"No RAD granule for {DATE}"
+                         + (f", orbit {args.orbit}" if args.orbit else "")
+                         + " inside the processing domain — ancillary data not downloaded")
+            sys.exit(1)
+
     if "mota" not in s3_synced:
         try:
             if session is None:

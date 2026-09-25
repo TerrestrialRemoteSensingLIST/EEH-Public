@@ -86,7 +86,7 @@ EUMETSAT_CONSUMER_SECRET=your_consumer_secret
 ```
 
 - **Earthdata** — free account at https://urs.earthdata.nasa.gov/ (ECOSTRESS, MOTA, OCO-2)
-- **CDS API** — key from https://cds.climate.copernicus.eu/how-to-api (ERA5)
+- **CDS API** — key from https://cds.climate.copernicus.eu/how-to-api (ERA5). The account must also accept the dataset licence once, logged in, at the bottom of the [ERA5 single levels download page](https://cds.climate.copernicus.eu/datasets/reanalysis-era5-single-levels?tab=download#manage-licences); the same licence covers the pressure-levels dataset. Otherwise every request fails with `403 required licences not accepted`
 - **CDSE** — free account at https://dataspace.copernicus.eu/ (FCOVER, LAI)
 - **EUMETSAT** — API keys from https://api.eumetsat.int/api-key/ (PAR, optional)
 - **S3** — endpoint + credentials for an S3-compatible bucket containing pre-staged data (optional)
