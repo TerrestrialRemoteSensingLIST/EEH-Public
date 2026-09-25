@@ -251,7 +251,9 @@ def compare(report, name, expected, actual, rel_tol, frac_tol):
             continue
         if key not in actual:
             return report.add(False, name, "no valid pixel, expected %s %.4f" % (key, expected[key]))
-        scale = max(abs(expected[key]), 1e-6)
+        # A minimum sits near zero for most fluxes; measured against itself,
+        # float noise of 1e-5 read as a 100% deviation. The mean sets the scale.
+        scale = max(abs(expected[key]), abs(expected.get("mean", 0.0)), 1e-6)
         if abs(actual[key] - expected[key]) / scale > rel_tol:
             return report.add(
                 False, name,
