@@ -1593,6 +1593,13 @@ def download_from_s3(output_dir: Path, date_str: str,
         is_global = local_subdir in _S3_GLOBAL_LOCAL_KEYS
         is_monthly = local_subdir in _S3_MONTHLY_LOCAL_KEYS
         is_doy = local_subdir == "mota"
+        match_date = date_str
+        if local_subdir == "oco2":
+            # OCO-2 stops in 2022; the bucket holds the stand-in year GPP reads,
+            # never the requested date itself.
+            stand_in = _oco2_target_date(date_str)
+            if stand_in:
+                match_date = stand_in.isoformat()
         filter_bbox = local_subdir == "glc30" and orbit_bbox is not None
         needs_rad_match = local_subdir in ("geo", "cloud") and rad_orbits
         extra = ""
@@ -1624,7 +1631,7 @@ def download_from_s3(output_dir: Path, date_str: str,
                         continue
                     if fname.endswith((".xml", ".dmrpp")):
                         continue
-                    if not is_global and not _s3_date_matches(fname, date_str, monthly=is_monthly, doy=is_doy):
+                    if not is_global and not _s3_date_matches(fname, match_date, monthly=is_monthly, doy=is_doy):
                         continue
                     if filter_bbox and not _glc30_tile_overlaps_bbox(fname, orbit_bbox):
                         continue
