@@ -31,6 +31,7 @@ import json
 import logging
 import os
 import sys
+import warnings
 from pathlib import Path
 
 import h5py
@@ -38,6 +39,9 @@ import numpy as np
 from dotenv import load_dotenv
 
 load_dotenv()
+
+# Distro ecCodes builds lag behind eccodes-python; older ones read ERA5 GRIB fine.
+warnings.filterwarnings("ignore", message=r"ecCodes .* or higher is recommended")
 
 logging.basicConfig(
     level=logging.INFO,
