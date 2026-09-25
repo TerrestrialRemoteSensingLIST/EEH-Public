@@ -289,6 +289,7 @@ def download_ecostress(session: requests.Session, output_dir: Path,
     domain_keys = _domain_scene_keys(session, orbit_key, bbox) if bbox else None
     if domain_keys is not None and not domain_keys:
         logger.warning("no granule intersects the processing domain on this date")
+        return 0, 0
     total, failed = 0, 0
     for label, concept_id, subdir in products:
         logger.info(f"\n--- {label} ({filter_msg}) ---")
@@ -1825,9 +1826,8 @@ def main():
             dl_failed += failed
             if failed:
                 logger.warning(f"{failed}/{total} ECOSTRESS files failed")
-            download_oco2(session, output_dir)
         except Exception as e:
-            logger.error(f"ECOSTRESS/OCO2 download failed: {e}")
+            logger.error(f"ECOSTRESS download failed: {e}")
             errors.append("ecostress")
 
     # Ancillaries only serve RAD granules; an orbit outside the domain used to
@@ -1840,6 +1840,13 @@ def main():
                          + (f", orbit {args.orbit}" if args.orbit else "")
                          + " inside the processing domain — ancillary data not downloaded")
             sys.exit(1)
+
+    if not args.skip_ecostress and "rad" not in s3_synced:
+        try:
+            download_oco2(session or _earthdata_session(), output_dir)
+        except Exception as e:
+            logger.error(f"OCO-2 download failed: {e}")
+            errors.append("oco2")
 
     if "mota" not in s3_synced:
         try:
