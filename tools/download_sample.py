@@ -250,6 +250,19 @@ def _scene_key(title: str) -> str | None:
     return m.group(1) if m else None
 
 
+def _geo_cloud_missing(output_dir: Path, orbit: str | None = None) -> bool:
+    """Whether a RAD granule of DATE on disk lacks its GEO or CLOUD companion."""
+    ymd = DATE.replace("-", "")
+    pattern = f"*_{orbit}_*_{ymd}T*.h5" if orbit else f"*_{ymd}T*.h5"
+    rad_keys = {_scene_key(f.name) for f in (output_dir / "rad").glob(pattern)}
+    rad_keys.discard(None)
+    for subdir in ("geo", "cloud"):
+        have = {_scene_key(f.name) for f in (output_dir / subdir).glob(pattern)}
+        if rad_keys - have:
+            return True
+    return False
+
+
 def _domain_scene_keys(session: requests.Session, orbit_key: str,
                        bbox: tuple[float, float, float, float]) -> set[str]:
     """Scene keys whose footprint intersects bbox (N, W, S, E).
@@ -1314,6 +1327,17 @@ def _split_era5_grib(src: Path, dest_dir: Path, prefix: str,
     return True
 
 
+def _era5_missing(output_dir: Path, orbit: str | None = None) -> bool:
+    """Whether any hourly file the granules on disk need is absent."""
+    single_times, pressure_times = _era5_required_times(output_dir, orbit)
+    dest_dir = output_dir / "era5"
+    return any(
+        not _era5_path(dest_dir, ERA5_DATASETS[kind][1], t).exists()
+        for kind, times in (("single_levels", single_times),
+                            ("pressure_levels", pressure_times))
+        for t in times)
+
+
 def download_era5(output_dir: Path, orbit: str | None = None) -> None:
     logger.info("\n--- ERA5 ---")
     try:
@@ -1824,7 +1848,10 @@ def main():
 
     session = None
     dl_failed = 0
-    if not args.skip_ecostress and "rad" not in s3_synced:
+    # "rad" in s3_synced says nothing about geo/ and cloud/: a bucket holding the
+    # RAD granules alone locked Earthdata out of supplying their companions.
+    if not args.skip_ecostress and ("rad" not in s3_synced
+                                    or _geo_cloud_missing(output_dir, args.orbit)):
         try:
             session = _earthdata_session()
             total, failed = download_ecostress(session, output_dir,
@@ -1867,7 +1894,10 @@ def main():
             logger.error(f"MOTA download failed: {e}")
             errors.append("mota")
 
-    if not args.skip_era5 and "era5" not in s3_synced:
+    # S3 marks era5/ synced on a single file; the bucket can hold other hours
+    # than the ones this orbit needs, and TES then has no profile to read.
+    if not args.skip_era5 and ("era5" not in s3_synced
+                               or _era5_missing(output_dir, args.orbit)):
         try:
             download_era5(output_dir, orbit=args.orbit)
         except Exception as e:
