@@ -1841,7 +1841,10 @@ def main():
                          + " inside the processing domain — ancillary data not downloaded")
             sys.exit(1)
 
-    if not args.skip_ecostress and "rad" not in s3_synced:
+    # Checked against the disk rather than tied to the ECOSTRESS download: RAD
+    # synced from S3, or an ancillary-only call, used to skip OCO-2 entirely and
+    # GPP then failed every granule of the date on a missing file.
+    if _oco2_on_disk(output_dir / "oco2", DATE) is None:
         try:
             download_oco2(session or _earthdata_session(), output_dir)
         except Exception as e:
