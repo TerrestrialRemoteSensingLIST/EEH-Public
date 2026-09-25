@@ -188,48 +188,62 @@ def run_cog(env: dict, input_files: list[str] | None = None,
 
 CMR_URL = "https://cmr.earthdata.nasa.gov/search/granules.json"
 RAD_CONCEPT = "C2076116385-LPCLOUD"
+# Only L1B_GEO is spatially indexed in CMR; a bounding_box search on RAD matches nothing.
+GEO_CONCEPT = "C2076087338-LPCLOUD"
+DOMAIN_DEFAULT = "75,-20,-35,60"  # N,W,S,E, as in tools/download_sample.py
 
 
-def _list_orbits(start_date: str, end_date: str) -> None:
+def _cmr_scenes_per_orbit(params: dict) -> tuple[int, dict[str, int]]:
     import requests
 
+    # Paginated: CMR returns one page per request, ordered by start time, so
+    # a single call listed only the first 200 of a 283-granule day and hid
+    # every orbit of the late evening -- including the ones an operator would
+    # pick to exercise the ERA5 midnight rollover.
+    entries = []
+    search_after = None
+    while True:
+        headers = {"Accept": "application/json"}
+        if search_after:
+            headers["CMR-Search-After"] = search_after
+        resp = requests.get(CMR_URL, params={**params, "page_size": 500},
+                            headers=headers)
+        resp.raise_for_status()
+        page = resp.json().get("feed", {}).get("entry", [])
+        if not page:
+            break
+        entries += page
+        search_after = resp.headers.get("CMR-Search-After")
+        if not search_after:
+            break
+    orbits: dict[str, int] = {}
+    for e in entries:
+        m = re.search(r'_(\d{5})_\d{3}_', e.get("title", ""))
+        if m:
+            orbits[m.group(1)] = orbits.get(m.group(1), 0) + 1
+    return len(entries), orbits
+
+
+def _list_orbits(start_date: str, end_date: str, domain: str) -> None:
+    n, w, s, e = (float(v) for v in domain.split(","))
     dt_start = datetime.strptime(start_date, "%Y-%m-%d")
     dt_end = datetime.strptime(end_date, "%Y-%m-%d")
     dt_cur = dt_start
     while dt_cur <= dt_end:
         day_str = dt_cur.strftime("%Y-%m-%d")
         temporal = f"{day_str}T00:00:00Z,{day_str}T23:59:59Z"
-        # Paginated: CMR returns one page per request, ordered by start time, so
-        # a single call listed only the first 200 of a 283-granule day and hid
-        # every orbit of the late evening -- including the ones an operator would
-        # pick to exercise the ERA5 midnight rollover.
-        entries = []
-        search_after = None
-        while True:
-            headers = {"Accept": "application/json"}
-            if search_after:
-                headers["CMR-Search-After"] = search_after
-            resp = requests.get(CMR_URL, params={
-                "concept_id": RAD_CONCEPT,
-                "temporal": temporal,
-                "page_size": 500,
-            }, headers=headers)
-            resp.raise_for_status()
-            page = resp.json().get("feed", {}).get("entry", [])
-            if not page:
-                break
-            entries += page
-            search_after = resp.headers.get("CMR-Search-After")
-            if not search_after:
-                break
-        orbits: dict[str, int] = {}
-        for e in entries:
-            m = re.search(r'_(\d{5})_\d{3}_', e.get("title", ""))
-            if m:
-                orbits[m.group(1)] = orbits.get(m.group(1), 0) + 1
-        logger.info(f"\n  {day_str}: {len(entries)} granules, {len(orbits)} orbits")
+        total, orbits = _cmr_scenes_per_orbit(
+            {"concept_id": RAD_CONCEPT, "temporal": temporal})
+        # The world count alone misled operators into picking orbits that never
+        # cross the domain, which the downloader then rejects.
+        _, in_domain = _cmr_scenes_per_orbit(
+            {"concept_id": GEO_CONCEPT, "temporal": temporal,
+             "bounding_box": f"{w},{s},{e},{n}"})
+        logger.info(f"\n  {day_str}: {total} granules, {len(orbits)} orbits "
+                    f"({len(in_domain)} crossing domain N,W,S,E = {domain})")
         for orb in sorted(orbits):
-            logger.info(f"    {orb}  ({orbits[orb]} scenes)")
+            logger.info(f"    {orb}  ({orbits[orb]} scenes, "
+                        f"{in_domain.get(orb, 0)} in domain)")
         dt_cur += timedelta(days=1)
     logger.info("")
 
@@ -299,15 +313,16 @@ def main(argv=None):
     if args.start_date and args.input_files:
         parser.error("--start-date/--end-date and --input-files are mutually exclusive.")
 
-    if args.list_orbits:
-        _list_orbits(args.start_date, args.end_date)
-        return
-
     env_path = Path(args.env)
     if env_path.exists():
         env = {**dotenv_values(env_path), **os.environ}
     else:
         env = dict(os.environ)
+
+    if args.list_orbits:
+        _list_orbits(args.start_date, args.end_date,
+                     env.get("EEH2_DOMAIN") or DOMAIN_DEFAULT)
+        return
 
     if args.download:
         dl_cmd = [sys.executable, DOWNLOAD_SCRIPT,
