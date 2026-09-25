@@ -51,7 +51,7 @@
         "valid_fraction": 0.990915,
         "minimum": 1.0,
         "maximum": 255.0,
-        "mean": 233.750218
+        "mean": 233.750217
       },
       "LST": {
         "shape": [
@@ -84,9 +84,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 1.92318993e-07,
+        "minimum": 1.49110349e-07,
         "maximum": 5.90105391,
-        "mean": 1.33110068
+        "mean": 1.3311007
       },
       "G": {
         "shape": [
@@ -95,9 +95,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 0.264919817,
+        "minimum": 0.264919728,
         "maximum": 36.6372223,
-        "mean": 10.4172332
+        "mean": 10.4172333
       },
       "H": {
         "shape": [
@@ -106,9 +106,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 0.85678041,
-        "maximum": 156.301178,
-        "mean": 30.6840314
+        "minimum": 0.856780112,
+        "maximum": 156.301163,
+        "mean": 30.6840313
       },
       "LE": {
         "shape": [
@@ -117,9 +117,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 4.6832949e-05,
+        "minimum": 5.65470837e-05,
         "maximum": 155.230606,
-        "mean": 41.5185066
+        "mean": 41.5185071
       },
       "Mrz": {
         "shape": [
@@ -128,9 +128,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 2.19781811e-08,
-        "maximum": 0.5230968,
-        "mean": 0.12744374
+        "minimum": 2.70548082e-08,
+        "maximum": 0.523096383,
+        "mean": 0.127443731
       },
       "Ms": {
         "shape": [
@@ -139,9 +139,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 1.28152928e-08,
-        "maximum": 0.501401067,
-        "mean": 0.254287476
+        "minimum": 1.57622289e-08,
+        "maximum": 0.501400948,
+        "mean": 0.254287471
       },
       "Rn": {
         "shape": [
@@ -150,9 +150,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 1.26539028,
+        "minimum": 1.2653898,
         "maximum": 174.240311,
-        "mean": 82.6079268
+        "mean": 82.6079267
       },
       "gah": {
         "shape": [
@@ -161,9 +161,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.311624,
-        "minimum": 5.41484696e-05,
-        "maximum": 0.0537951887,
-        "mean": 0.00390090822
+        "minimum": 5.41484515e-05,
+        "maximum": 0.0537952073,
+        "mean": 0.00390090831
       },
       "gsc": {
         "shape": [
@@ -173,8 +173,8 @@
         "dtype": "float32",
         "valid_fraction": 0.311624,
         "minimum": 2.15043938e-09,
-        "maximum": 0.0139306262,
-        "mean": 0.0021905615
+        "maximum": 0.0139306281,
+        "mean": 0.00219056151
       }
     },
     "gpp/EEH2STIC_L3_GPP_36798_016_20250101T165758_0000_00.h5": {
@@ -186,8 +186,8 @@
         "dtype": "float32",
         "valid_fraction": 0.09142,
         "minimum": 0.0,
-        "maximum": 5.47242853e-05,
-        "mean": 1.21309864e-05
+        "maximum": 6.61366576e-05,
+        "mean": 1.23361909e-05
       },
       "GPP_gs": {
         "shape": [
@@ -196,9 +196,9 @@
         ],
         "dtype": "float32",
         "valid_fraction": 0.09142,
-        "minimum": 2.35302196e-06,
-        "maximum": 0.000161886652,
-        "mean": 5.56114112e-05
+        "minimum": 2.35302218e-06,
+        "maximum": 0.000161886623,
+        "mean": 5.56114124e-05
       },
       "GPPd": {
         "shape": [
@@ -209,7 +209,7 @@
         "valid_fraction": 0.09142,
         "minimum": 0.0,
         "maximum": 21.4098644,
-        "mean": 5.68749632
+        "mean": 5.7443872
       },
       "GPPi": {
         "shape": [
@@ -219,8 +219,8 @@
         "dtype": "float32",
         "valid_fraction": 0.09142,
         "minimum": 0.0,
-        "maximum": 5.47242853e-05,
-        "mean": 1.22431259e-05
+        "maximum": 6.61366576e-05,
+        "mean": 1.24483303e-05
       },
       "LUCC": {
         "shape": [
@@ -228,10 +228,10 @@
           5400
         ],
         "dtype": "int16",
-        "valid_fraction": 0.282988,
+        "valid_fraction": 0.287235,
         "minimum": 2.0,
         "maximum": 18.0,
-        "mean": 8.77659267
+        "mean": 8.7092688
       },
       "WUEd": {
         "shape": [
@@ -241,8 +241,8 @@
         "dtype": "float32",
         "valid_fraction": 0.09142,
         "minimum": 0.0,
-        "maximum": 1219.61792,
-        "mean": 9.60489079
+        "maximum": 1320.52441,
+        "mean": 9.63706387
       }
     }
   }
