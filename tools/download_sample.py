@@ -1942,7 +1942,10 @@ def main():
             logger.error(f"LULC download failed: {e}")
             errors.append("lulc")
 
-    if not args.skip_glc30 and "glc30" not in s3_synced:
+    # download_glc30 checks the footprint's strips against the disk itself; the
+    # S3 gate skipped it on a single synced tile and left GPP without land cover
+    # over whole strips.
+    if not args.skip_glc30:
         try:
             download_glc30(output_dir, orbit=args.orbit)
         except Exception as e:
